@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-require "userpattern/version"
-require "userpattern/configuration"
+require 'userpattern/version'
+require 'userpattern/configuration'
 
 module UserPattern
   class << self
@@ -15,7 +15,7 @@ module UserPattern
 
     def buffer
       @buffer ||= begin
-        require "userpattern/buffer"
+        require 'userpattern/buffer'
         Buffer.new
       end
     end
@@ -25,7 +25,7 @@ module UserPattern
     end
 
     def cleanup!
-      require "userpattern/request_event_cleanup"
+      require 'userpattern/request_event_cleanup'
       RequestEventCleanup.run!
     end
 
@@ -37,4 +37,4 @@ module UserPattern
   end
 end
 
-require "userpattern/engine" if defined?(Rails::Engine)
+require 'userpattern/engine' if defined?(Rails::Engine)

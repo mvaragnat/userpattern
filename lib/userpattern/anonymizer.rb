@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "openssl"
+require 'openssl'
 
 module UserPattern
   # Produces a one-way anonymous session identifier that:
@@ -8,7 +8,7 @@ module UserPattern
   # - Rotates daily via a date-scoped salt (prevents cross-day correlation)
   # - Cannot be reversed to recover user identity or session ID
   class Anonymizer
-    DIGEST = "SHA256"
+    DIGEST = 'SHA256'
     TRUNCATE_LENGTH = 16
 
     def self.anonymize(request)
@@ -24,16 +24,15 @@ module UserPattern
         detection = UserPattern.configuration.session_detection
 
         case detection
-        when :auto   then auto_detect(request)
-        when :session then session_based(request)
-        when :header  then header_based(request)
-        when Proc     then detection.call(request).to_s
-        else auto_detect(request)
+        when :auto, nil then auto_detect(request)
+        when :session   then session_based(request)
+        when :header    then header_based(request)
+        when Proc       then detection.call(request).to_s
         end
       end
 
       def auto_detect(request)
-        if request.headers["Authorization"].present?
+        if request.headers['Authorization'].present?
           header_based(request)
         elsif request.respond_to?(:session) && request.session.respond_to?(:id) && request.session.id.present?
           session_based(request)
@@ -47,7 +46,7 @@ module UserPattern
       end
 
       def header_based(request)
-        request.headers["Authorization"].to_s
+        request.headers['Authorization'].to_s
       end
     end
   end

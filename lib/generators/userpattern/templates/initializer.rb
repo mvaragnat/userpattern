@@ -5,7 +5,7 @@ UserPattern.configure do |config|
   # Each entry needs a :name and optionally a :current_method.
   # If :current_method is omitted, it defaults to :current_<underscored_name>.
   config.tracked_models = [
-    { name: "User", current_method: :current_user },
+    { name: 'User', current_method: :current_user }
     # { name: "Admin", current_method: :current_admin },
   ]
 

@@ -2,12 +2,14 @@
 
 module UserPattern
   class Configuration
-    attr_accessor :tracked_models, :flush_interval, :buffer_size,
+    attr_reader :tracked_models
+
+    attr_accessor :flush_interval, :buffer_size,
                   :retention_period, :dashboard_auth, :anonymous_salt,
                   :session_detection, :enabled, :ignored_paths
 
     def initialize
-      @tracked_models = [{ name: "User", current_method: :current_user }]
+      @tracked_models = [{ name: 'User', current_method: :current_user }]
       @flush_interval = 30
       @buffer_size = 100
       @retention_period = 30 # days

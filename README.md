@@ -131,6 +131,27 @@ anonymous_session_id = HMAC-SHA256(
 | **Truncation** | Only 16 hex chars kept (64 bits), further reducing entropy |
 | **No user↔action link** | No user ID in the database. Even with full DB access you can only see aggregate stats |
 
+### URL and query string normalization
+
+Endpoints are normalized **at collection time** so that URLs differing only by dynamic segments are aggregated into a single pattern. No raw URL ever reaches the database.
+
+**Path segments** — numeric IDs, UUIDs, and long hex tokens are replaced with `:id`:
+
+```
+/sinistres/2604921/member_ratio    → /sinistres/:id/member_ratio
+/sinistres/2605294/member_ratio    → /sinistres/:id/member_ratio   (same row)
+/resources/84ef5373-0e95-4477-...  → /resources/:id
+/verify/a1b2c3d4e5f6a7b8c9d0      → /verify/:id
+```
+
+**Query parameters** — values that look like IDs, UUIDs, or tokens are redacted with `:xxx`. Non-dynamic values (e.g. `status=active`) are preserved. Parameters are sorted so that different orderings map to the same endpoint:
+
+```
+/admin?application_id=84ef5373-...        → /admin?application_id=:xxx
+/search?status=active                     → /search?status=active
+/api?user_id=42&status=open&token=abc...  → /api?status=open&token=:xxx&user_id=:xxx
+```
+
 ### Session detection modes
 
 The default `:auto` mode picks the best source automatically:

@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "concurrent"
+require 'concurrent'
 
 module UserPattern
   # Thread-safe in-memory buffer that batches request events before flushing
@@ -23,27 +23,9 @@ module UserPattern
       return if @queue.empty?
       return unless @flushing.make_true
 
-      begin
-        events = drain_queue
-        return if events.empty?
-
-        now = Time.current
-        rows = events.map do |e|
-          {
-            model_type: e[:model_type],
-            endpoint: e[:endpoint],
-            anonymous_session_id: e[:anonymous_session_id],
-            recorded_at: e[:recorded_at],
-            created_at: now
-          }
-        end
-
-        UserPattern::RequestEvent.insert_all(rows)
-      rescue => e
-        Rails.logger.error("[UserPattern] Flush error: #{e.message}")
-      ensure
-        @flushing.make_false
-      end
+      persist_events
+    ensure
+      @flushing.make_false
     end
 
     def shutdown
@@ -56,6 +38,17 @@ module UserPattern
     end
 
     private
+
+    def persist_events
+      events = drain_queue
+      return if events.empty?
+
+      now = Time.current
+      rows = events.map { |e| e.merge(created_at: now) }
+      UserPattern::RequestEvent.insert_all(rows)
+    rescue StandardError => e
+      Rails.logger.error("[UserPattern] Flush error: #{e.message}")
+    end
 
     def drain_queue
       events = []

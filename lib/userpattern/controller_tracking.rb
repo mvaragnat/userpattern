@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
-require "userpattern/anonymizer"
+require 'userpattern/anonymizer'
+require 'userpattern/path_normalizer'
 
 module UserPattern
   module ControllerTracking
@@ -16,13 +17,17 @@ module UserPattern
       return unless UserPattern.enabled?
       return if _userpattern_internal_request?
 
+      _userpattern_record_matching_models
+    end
+
+    def _userpattern_record_matching_models
       UserPattern.configuration.tracked_models.each do |model_config|
         user = _userpattern_resolve(model_config[:current_method])
         next unless user
 
         UserPattern.buffer.push(
           model_type: model_config[:name],
-          endpoint: "#{request.method} #{request.path}",
+          endpoint: "#{request.method} #{UserPattern::PathNormalizer.normalize(request.fullpath)}",
           anonymous_session_id: UserPattern::Anonymizer.anonymize(request),
           recorded_at: Time.current
         )
@@ -38,7 +43,7 @@ module UserPattern
     end
 
     def _userpattern_internal_request?
-      self.class.name.to_s.start_with?("UserPattern::")
+      self.class.name.to_s.start_with?('UserPattern::')
     end
   end
 end
