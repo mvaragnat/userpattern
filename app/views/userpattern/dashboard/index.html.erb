@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>UserPattern — Usage Dashboard</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #f5f7fa;
+      color: #1a1a2e;
+      line-height: 1.5;
+      padding: 2rem;
+    }
+
+    .container { max-width: 1200px; margin: 0 auto; }
+
+    header {
+      display: flex;
+      align-items: baseline;
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    header h1 { font-size: 1.6rem; font-weight: 700; }
+    header .version { color: #888; font-size: 0.85rem; }
+
+    .tabs {
+      display: flex;
+      gap: 0.25rem;
+      margin-bottom: 1.5rem;
+      border-bottom: 2px solid #e0e0e0;
+    }
+
+    .tabs a {
+      display: inline-block;
+      padding: 0.5rem 1.25rem;
+      text-decoration: none;
+      color: #555;
+      font-weight: 500;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      transition: color 0.15s, border-color 0.15s;
+    }
+
+    .tabs a:hover { color: #1a1a2e; }
+    .tabs a.active { color: #2563eb; border-bottom-color: #2563eb; }
+
+    .card {
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+
+    thead { background: #f8fafc; }
+
+    th, td {
+      padding: 0.75rem 1rem;
+      text-align: left;
+      border-bottom: 1px solid #eee;
+      white-space: nowrap;
+    }
+
+    th {
+      font-weight: 600;
+      color: #475569;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    th:hover { color: #2563eb; }
+
+    th .arrow {
+      display: inline-block;
+      margin-left: 4px;
+      font-size: 0.7rem;
+      color: #94a3b8;
+    }
+
+    th.sorted-asc .arrow::after { content: "\25B2"; color: #2563eb; }
+    th.sorted-desc .arrow::after { content: "\25BC"; color: #2563eb; }
+    th:not(.sorted-asc):not(.sorted-desc) .arrow::after { content: "\25B4\25BE"; }
+
+    td.endpoint { font-family: "SF Mono", Monaco, "Cascadia Code", monospace; font-size: 0.85rem; }
+
+    td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    th.num { text-align: right; }
+
+    tbody tr:hover { background: #f1f5f9; }
+
+    .empty-state {
+      text-align: center;
+      padding: 4rem 2rem;
+      color: #94a3b8;
+    }
+
+    .footer {
+      margin-top: 1.5rem;
+      font-size: 0.8rem;
+      color: #94a3b8;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>UserPattern</h1>
+      <span class="version">v<%= UserPattern::VERSION %></span>
+    </header>
+
+    <% if @model_types.any? %>
+      <nav class="tabs">
+        <% @model_types.each do |mt| %>
+          <a href="<%= userpattern.root_path(model_type: mt) %>"
+             class="<%= 'active' if mt == @selected_model %>">
+            <%= mt %>
+          </a>
+        <% end %>
+      </nav>
+    <% end %>
+
+    <div class="card">
+      <% if @filtered_stats.present? %>
+        <table id="stats-table">
+          <thead>
+            <tr>
+              <%
+                columns = [
+                  { key: "endpoint",       label: "Endpoint",     numeric: false },
+                  { key: "total_requests", label: "Total Reqs",   numeric: true },
+                  { key: "total_sessions", label: "Sessions",     numeric: true },
+                  { key: "avg_per_session", label: "Avg / Session", numeric: true },
+                  { key: "avg_per_minute", label: "Avg / Min",    numeric: true },
+                  { key: "max_per_minute", label: "Max / Min",    numeric: true },
+                  { key: "max_per_hour",   label: "Max / Hour",   numeric: true },
+                  { key: "max_per_day",    label: "Max / Day",    numeric: true },
+                ]
+
+                current_sort = params[:sort]
+                current_dir  = params[:dir] || "desc"
+              %>
+              <% columns.each do |col| %>
+                <%
+                  is_sorted = current_sort == col[:key]
+                  next_dir  = is_sorted && current_dir == "desc" ? "asc" : "desc"
+                  css_class = []
+                  css_class << "num" if col[:numeric]
+                  css_class << "sorted-#{current_dir}" if is_sorted
+                %>
+                <th class="<%= css_class.join(' ') %>">
+                  <a href="<%= userpattern.root_path(model_type: @selected_model, sort: col[:key], dir: next_dir) %>"
+                     style="text-decoration:none; color:inherit;">
+                    <%= col[:label] %><span class="arrow"></span>
+                  </a>
+                </th>
+              <% end %>
+            </tr>
+          </thead>
+          <tbody>
+            <% @filtered_stats.each do |stat| %>
+              <tr>
+                <td class="endpoint"><%= stat[:endpoint] %></td>
+                <td class="num"><%= stat[:total_requests] %></td>
+                <td class="num"><%= stat[:total_sessions] %></td>
+                <td class="num"><%= stat[:avg_per_session] %></td>
+                <td class="num"><%= stat[:avg_per_minute] %></td>
+                <td class="num"><%= stat[:max_per_minute] %></td>
+                <td class="num"><%= stat[:max_per_hour] %></td>
+                <td class="num"><%= stat[:max_per_day] %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      <% else %>
+        <div class="empty-state">
+          <p>No data collected yet for <strong><%= @selected_model || "any model" %></strong>.</p>
+          <p>Requests from logged-in users will appear here automatically.</p>
+        </div>
+      <% end %>
+    </div>
+
+    <p class="footer">
+      Data retained for <%= UserPattern.configuration.retention_period %> days
+      &middot;
+      <% total_events = UserPattern::RequestEvent.count %>
+      <%= total_events %> event<%= total_events == 1 ? "" : "s" %> in store
+    </p>
+  </div>
+</body>
+</html>
