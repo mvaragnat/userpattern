@@ -23,7 +23,7 @@ module Userpattern
     end
 
     def mount_engine
-      route 'mount UserPattern::Engine, at: "/userpattern"'
+      route 'mount UserPattern::Engine, at: "/userpatterns"'
     end
 
     def display_post_install
@@ -31,7 +31,7 @@ module Userpattern
       say "UserPattern installed! Next steps:", :green
       say "  1. Run `rails db:migrate`"
       say "  2. Edit config/initializers/userpattern.rb to configure tracked models"
-      say "  3. Visit /userpattern to see the dashboard"
+      say "  3. Visit /userpatterns to see the dashboard"
       say ""
     end
   end

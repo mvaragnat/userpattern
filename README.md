@@ -33,7 +33,7 @@ rails db:migrate
 The generator creates:
 1. `config/initializers/userpattern.rb` — configuration file
 2. A migration for the `userpattern_request_events` table
-3. A route mounting the dashboard at `/userpattern`
+3. A route mounting the dashboard at `/userpatterns`
 
 ## Configuration
 
@@ -191,7 +191,7 @@ The dashboard is served at the engine mount path:
 
 ```ruby
 # config/routes.rb
-mount UserPattern::Engine, at: "/userpattern"
+mount UserPattern::Engine, at: "/userpatterns"
 ```
 
 It displays, per model type:
@@ -237,7 +237,7 @@ config.dashboard_auth = -> {
 ```ruby
 # config/routes.rb
 authenticate :user, ->(u) { u.admin? } do
-  mount UserPattern::Engine, at: "/userpattern"
+  mount UserPattern::Engine, at: "/userpatterns"
 end
 ```
 
@@ -258,9 +258,9 @@ config.dashboard_auth = -> {
 ```
 userpattern/
 ├── app/
-│   ├── controllers/userpattern/dashboard_controller.rb
-│   ├── models/userpattern/request_event.rb
-│   └── views/userpattern/dashboard/index.html.erb
+│   ├── controllers/user_pattern/dashboard_controller.rb
+│   ├── models/user_pattern/request_event.rb
+│   └── views/user_pattern/dashboard/index.html.erb
 ├── config/routes.rb
 ├── lib/
 │   ├── userpattern.rb
