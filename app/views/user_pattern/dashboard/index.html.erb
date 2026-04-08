@@ -121,7 +121,7 @@
     <% if @model_types.any? %>
       <nav class="tabs">
         <% @model_types.each do |mt| %>
-          <a href="<%= userpattern.root_path(model_type: mt) %>"
+          <a href="<%= user_pattern.root_path(model_type: mt) %>"
              class="<%= 'active' if mt == @selected_model %>">
             <%= mt %>
           </a>
@@ -158,7 +158,7 @@
                   css_class << "sorted-#{current_dir}" if is_sorted
                 %>
                 <th class="<%= css_class.join(' ') %>">
-                  <a href="<%= userpattern.root_path(model_type: @selected_model, sort: col[:key], dir: next_dir) %>"
+                  <a href="<%= user_pattern.root_path(model_type: @selected_model, sort: col[:key], dir: next_dir) %>"
                      style="text-decoration:none; color:inherit;">
                     <%= col[:label] %><span class="arrow"></span>
                   </a>
