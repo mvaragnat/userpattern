@@ -2,13 +2,12 @@
 
 UserPattern.configure do |config|
   # ─── Tracked models ────────────────────────────────────────────────
-  # By default, the User model is tracked via `current_user`.
-  # To track additional models, use `config.track`:
-  #
-  #   config.track "Admin", current_method: :current_admin
-  #
-  # The default list:
-  config.tracked_models = [{ name: "User", current_method: :current_user }]
+  # Each entry needs a :name and optionally a :current_method.
+  # If :current_method is omitted, it defaults to :current_<underscored_name>.
+  config.tracked_models = [
+    { name: "User", current_method: :current_user },
+    # { name: "Admin", current_method: :current_admin },
+  ]
 
   # ─── Session detection ─────────────────────────────────────────────
   # How to identify a session for anonymized grouping.

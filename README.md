@@ -1,28 +1,28 @@
 # UserPattern
 
-Analyse anonymisée des patterns d'usage des utilisateurs connectés dans une application Rails.
+Anonymized usage-pattern analysis for Rails applications.
 
-UserPattern s'installe comme une gem Rails. Elle intercepte les requêtes des utilisateurs authentifiés, collecte des statistiques de fréquence par endpoint, et présente un tableau de bord triable — le tout sans jamais stocker d'identifiant utilisateur.
+UserPattern plugs into any Rails app as an engine. It intercepts requests from authenticated users, collects per-endpoint frequency statistics, and presents a sortable dashboard — all without ever storing a user identifier.
 
-## Fonctionnalités
+## Features
 
-- **Multi-modèle** : tracke `User`, `Admin`, ou tout modèle authentifiable. Configurable.
-- **Compatible Devise + JWT** : détecte automatiquement l'authentification par session cookie ou par header `Authorization`.
-- **Anonymisation totale** : impossible de retrouver les actions d'un utilisateur donné (HMAC à sel rotatif quotidien).
-- **Impact minimal sur la performance** : buffer en mémoire, écriture en batch asynchrone.
-- **Dashboard intégré** : tableau HTML triable par fréquence, filtrable par type de modèle.
-- **Nettoyage automatisable** : tâche rake pour purger les données expirées.
+- **Multi-model** — track `User`, `Admin`, or any authenticatable model.
+- **Devise + JWT compatible** — auto-detects session cookies and `Authorization` headers.
+- **Fully anonymized** — impossible to trace actions back to a specific user (daily-rotating HMAC salt).
+- **Minimal performance impact** — in-memory buffer, async batch writes.
+- **Built-in dashboard** — sortable HTML table, filterable by model type.
+- **Automatic cleanup** — rake task to purge expired data.
 
 ## Installation
 
-Ajouter au `Gemfile` de votre application :
+Add to your application's `Gemfile`:
 
 ```ruby
-gem "userpattern", path: "path/to/userpattern"  # en développement local
+gem "userpattern", path: "path/to/userpattern"   # local development
 # gem "userpattern", github: "your-org/userpattern"  # via GitHub
 ```
 
-Puis lancer le générateur d'installation :
+Run the install generator:
 
 ```bash
 bundle install
@@ -30,10 +30,10 @@ rails generate userpattern:install
 rails db:migrate
 ```
 
-Le générateur crée :
-1. `config/initializers/userpattern.rb` — fichier de configuration
-2. La migration pour la table `userpattern_request_events`
-3. La route vers le dashboard (`/userpattern`)
+The generator creates:
+1. `config/initializers/userpattern.rb` — configuration file
+2. A migration for the `userpattern_request_events` table
+3. A route mounting the dashboard at `/userpattern`
 
 ## Configuration
 
@@ -41,183 +41,179 @@ Le générateur crée :
 # config/initializers/userpattern.rb
 
 UserPattern.configure do |config|
-  # Modèles à traquer (par défaut : User via current_user)
-  config.tracked_models = [{ name: "User", current_method: :current_user }]
+  # Models to track. Each entry needs :name and optionally :current_method.
+  # If :current_method is omitted it defaults to :current_<underscored_name>.
+  config.tracked_models = [
+    { name: "User", current_method: :current_user },
+    { name: "Admin", current_method: :current_admin },
+  ]
 
-  # Ajouter d'autres modèles
-  config.track "Admin", current_method: :current_admin
-
-  # Détection de session (voir section dédiée ci-dessous)
+  # Session detection mode (see "Session detection" section below)
   config.session_detection = :auto
 
-  # Performance : taille du buffer et intervalle de flush
-  config.buffer_size    = 100  # flush quand le buffer atteint cette taille
-  config.flush_interval = 30   # flush au moins toutes les N secondes
+  # Buffer tuning
+  config.buffer_size    = 100  # flush when buffer reaches this size
+  config.flush_interval = 30   # flush at least every N seconds
 
-  # Rétention des données brutes (en jours)
+  # Data retention (days). Old events are removed by `rake userpattern:cleanup`.
   config.retention_period = 30
 
-  # Authentification du dashboard (voir section sécurité)
+  # Dashboard authentication (see "Securing the dashboard" section below)
   config.dashboard_auth = nil
 
-  # Activer/désactiver le tracking
+  # Enable / disable tracking globally
   config.enabled = true
 end
 ```
 
-## Détection de l'utilisateur connecté
+## Detecting the logged-in user
 
-### Stratégie par défaut : `current_user`
+### Default strategy: `current_user`
 
-UserPattern utilise un callback `after_action` dans les contrôleurs. Pour chaque modèle configuré, il appelle la méthode spécifiée (par défaut `current_user`) :
-
-```ruby
-config.tracked_models = [{ name: "User", current_method: :current_user }]
-```
-
-### Devise + sessions classiques
-
-Avec Devise, `current_user` est disponible dans tous les contrôleurs via le helper Warden. **Aucune configuration supplémentaire nécessaire.**
-
-### Devise + JWT (devise-jwt, devise-token-auth)
-
-Avec `devise-jwt` ou des gems similaires, le middleware Warden est configuré pour authentifier via le token JWT dans le header `Authorization`. **`current_user` fonctionne donc aussi en mode API, sans adaptation.**
-
-Le flow :
-1. Le client envoie `Authorization: Bearer <token>`
-2. Warden (via la stratégie JWT de Devise) décode le token et hydrate `current_user`
-3. UserPattern appelle `current_user` dans le `after_action` — l'utilisateur est détecté
-
-### JWT custom (sans Devise)
-
-Si vous utilisez un système JWT maison qui n'alimente pas `current_user`, vous pouvez :
-
-1. Définir une méthode `current_user` dans votre `ApplicationController` qui décode le JWT
-2. Ou spécifier une méthode custom :
+UserPattern hooks into controllers via an `after_action` callback. For each configured model it calls the specified method (defaults to `current_user`):
 
 ```ruby
 config.tracked_models = [
-  { name: "ApiClient", current_method: :current_api_client }
+  { name: "User" },                                    # calls current_user
+  { name: "Admin", current_method: :current_admin },   # calls current_admin
 ]
 ```
 
-### Modèles multiples
+### Devise + classic sessions
 
-Pour traquer plusieurs types d'utilisateurs (ex: Devise avec scopes) :
+With Devise, `current_user` is available in every controller through the Warden helper. **No extra configuration needed.**
+
+### Devise + JWT (devise-jwt, devise-token-auth)
+
+With `devise-jwt` or similar gems, Warden is configured to authenticate via the JWT token in the `Authorization` header. **`current_user` works out of the box for API requests too.**
+
+The flow:
+1. Client sends `Authorization: Bearer <token>`
+2. Warden (via the JWT strategy) decodes the token and hydrates `current_user`
+3. UserPattern calls `current_user` in the `after_action` — the user is detected
+
+### Custom JWT (without Devise)
+
+If you use a custom JWT system that does not populate `current_user`, either:
+
+1. Define a `current_user` method in your `ApplicationController` that decodes the JWT, or
+2. Point to your own method:
 
 ```ruby
-config.tracked_models = [{ name: "User", current_method: :current_user }]
-config.track "Admin", current_method: :current_admin
-config.track "ApiClient", current_method: :current_api_client
+config.tracked_models = [
+  { name: "ApiClient", current_method: :current_api_client },
+]
 ```
 
-Chaque requête est comptabilisée pour **tous** les modèles correspondants (si un utilisateur est simultanément `User` et `Admin`, les deux sont trackés).
+### Multiple models
 
-## Anonymisation
+When a request matches several models (e.g. a user who is both `User` and `Admin` through Devise scopes), all matching models are tracked independently.
 
-### Principe
+## Anonymization
 
-UserPattern ne stocke **jamais** d'identifiant utilisateur (id, email, etc.). L'anonymisation repose sur un identifiant de session opaque :
+### How it works
+
+UserPattern **never stores a user identifier** (no id, email, or any PII). It derives an opaque session fingerprint:
 
 ```
 anonymous_session_id = HMAC-SHA256(
-  clé:    secret_key_base[0..31] + ":2026-04-08",
-  valeur: session_id | authorization_header
+  key:   secret_key_base[0..31] + ":2026-04-08",
+  value: session_id | authorization_header
 )[0..15]
 ```
 
-### Propriétés de sécurité
+### Security properties
 
-| Propriété | Garantie |
+| Property | Guarantee |
 |---|---|
-| **Irréversibilité** | HMAC one-way : impossible de retrouver le session_id ou l'utilisateur |
-| **Rotation quotidienne** | Le sel change chaque jour → impossible de corréler les sessions d'un jour à l'autre |
-| **Troncature** | Seuls 16 caractères hex sont conservés (64 bits), réduisant encore l'entropie |
-| **Pas de lien user↔actions** | Aucun user_id en base. Même avec un accès complet à la DB, on ne peut que voir des stats agrégées |
+| **Irreversible** | HMAC is one-way — cannot recover the session ID or user |
+| **Daily rotation** | Salt changes every day — cross-day correlation is impossible |
+| **Truncation** | Only 16 hex chars kept (64 bits), further reducing entropy |
+| **No user↔action link** | No user ID in the database. Even with full DB access you can only see aggregate stats |
 
-### Détection de session
+### Session detection modes
 
-Le mode `:auto` (par défaut) choisit automatiquement :
-- **Header `Authorization` présent** → hash du header (cas JWT/API)
-- **Session cookie présent** → hash du session ID (cas navigateur classique)
-- **Aucun des deux** → hash de l'IP (fallback)
+The default `:auto` mode picks the best source automatically:
+- **`Authorization` header present** → hash the header (JWT / API case)
+- **Session cookie present** → hash the session ID (browser case)
+- **Neither** → hash the remote IP (fallback)
 
-Vous pouvez forcer un mode ou fournir un Proc custom :
+You can force a mode or provide a custom Proc:
 
 ```ruby
-config.session_detection = :header   # toujours utiliser le header Authorization
-config.session_detection = :session  # toujours utiliser le cookie de session
+config.session_detection = :header   # always use the Authorization header
+config.session_detection = :session  # always use the session cookie
 config.session_detection = ->(request) { request.headers["X-Request-ID"] }
 ```
 
 ## Performance
 
-UserPattern est conçu pour avoir un impact négligeable sur les temps de réponse.
+UserPattern is designed to add negligible overhead to response times.
 
-### Architecture du buffer
+### Buffer architecture
 
 ```
-Requête HTTP
+HTTP request
     ↓
 after_action (< 0.1ms)
     ↓ push
-[Buffer mémoire thread-safe]   ← Concurrent::Array
-    ↓ flush (async, toutes les 30s ou 100 events)
-[INSERT batch en DB]            ← ActiveRecord insert_all
+[Thread-safe in-memory buffer]   ← Concurrent::Array
+    ↓ flush (async, every 30s or 100 events)
+[Batch INSERT into DB]           ← ActiveRecord insert_all
 ```
 
-- Le `after_action` ne fait qu'un `push` dans un array thread-safe (~microsecondes)
-- Le flush se fait dans un thread séparé, sans bloquer la requête
-- `insert_all` écrit tous les events en un seul INSERT SQL
-- Les paramètres `buffer_size` et `flush_interval` sont configurables
+- The `after_action` only pushes to a thread-safe array (~microseconds)
+- Flushing happens in a separate thread — never blocks the request
+- `insert_all` writes all buffered events in a single INSERT statement
+- `buffer_size` and `flush_interval` are configurable
 
-### Requêtes sur le dashboard
+### Database indexes
 
-Le dashboard calcule les stats à la volée à partir de la table `userpattern_request_events`. Trois index couvrent les requêtes principales :
+Three indexes cover the dashboard queries:
 
-- `(model_type, endpoint, recorded_at)` — agrégation temporelle
-- `(model_type, endpoint, anonymous_session_id)` — comptage de sessions distinctes
-- `(recorded_at)` — nettoyage des données expirées
+- `(model_type, endpoint, recorded_at)` — time-bucketed aggregation
+- `(model_type, endpoint, anonymous_session_id)` — distinct session counting
+- `(recorded_at)` — expired event cleanup
 
-### Nettoyage
+### Cleanup
 
-Pour éviter que la table ne grossisse indéfiniment :
+To prevent the table from growing indefinitely:
 
 ```bash
 rails userpattern:cleanup
 ```
 
-À planifier en cron (quotidien recommandé). Supprime les events plus vieux que `retention_period` (30 jours par défaut).
+Schedule as a daily cron job. Deletes events older than `retention_period` (30 days by default).
 
 ## Dashboard
 
-Le dashboard est accessible à la route où vous montez l'engine :
+The dashboard is served at the engine mount path:
 
 ```ruby
 # config/routes.rb
 mount UserPattern::Engine, at: "/userpattern"
 ```
 
-Il affiche, par type de modèle :
+It displays, per model type:
 
-| Colonne | Description |
+| Column | Description |
 |---|---|
-| **Endpoint** | Méthode HTTP + chemin (ex: `GET /api/users`) |
-| **Total Reqs** | Nombre total de requêtes enregistrées |
-| **Sessions** | Nombre de sessions distinctes (anonymisées) |
-| **Avg / Session** | Moyenne de requêtes par session |
-| **Avg / Min** | Fréquence moyenne par minute |
-| **Max / Min** | Fréquence maximale observée sur 1 minute |
-| **Max / Hour** | Fréquence maximale observée sur 1 heure |
-| **Max / Day** | Fréquence maximale observée sur 1 jour |
+| **Endpoint** | HTTP method + path (e.g. `GET /api/users`) |
+| **Total Reqs** | Total recorded requests |
+| **Sessions** | Distinct anonymized sessions |
+| **Avg / Session** | Average requests per session |
+| **Avg / Min** | Average frequency per minute |
+| **Max / Min** | Peak frequency over any 1-minute window |
+| **Max / Hour** | Peak frequency over any 1-hour window |
+| **Max / Day** | Peak frequency over any 1-day window |
 
-Toutes les colonnes sont triables (clic sur l'en-tête).
+All columns are sortable (click the header).
 
-## Sécuriser le dashboard
+## Securing the dashboard
 
-**Le dashboard n'est pas protégé par défaut.** Vous devez configurer l'authentification.
+**The dashboard is unprotected by default.** You must configure authentication.
 
-### Option 1 : HTTP Basic Auth
+### Option 1: HTTP Basic Auth
 
 ```ruby
 config.dashboard_auth = -> {
@@ -228,15 +224,15 @@ config.dashboard_auth = -> {
 }
 ```
 
-### Option 2 : Devise (restreindre aux admins)
+### Option 2: Devise (admin-only)
 
 ```ruby
 config.dashboard_auth = -> {
-  redirect_to main_app.root_path, alert: "Accès refusé" unless current_user&.admin?
+  redirect_to main_app.root_path, alert: "Access denied" unless current_user&.admin?
 }
 ```
 
-### Option 3 : Contrainte de route Rails
+### Option 3: Rails routing constraint
 
 ```ruby
 # config/routes.rb
@@ -245,21 +241,19 @@ authenticate :user, ->(u) { u.admin? } do
 end
 ```
 
-### Option 4 : IP whitelisting
+### Option 4: IP allowlist
 
 ```ruby
 config.dashboard_auth = -> {
-  unless request.remote_ip.in?(%w[127.0.0.1 ::1])
-    head :forbidden
-  end
+  head :forbidden unless request.remote_ip.in?(%w[127.0.0.1 ::1])
 }
 ```
 
-## Prochaines étapes (non implémenté)
+## Roadmap (not yet implemented)
 
-**Alertes de seuil** : définir des seuils par endpoint (ex: max 10 requêtes/minute) et recevoir une alerte quand un utilisateur connecté dépasse ce seuil. L'architecture actuelle (events individuels avec timestamps) permet d'implémenter cette fonctionnalité sans changement de schéma.
+**Threshold alerts** — define per-endpoint thresholds (e.g. max 10 requests/minute) and get notified when a logged-in user exceeds them. The current schema (individual events with timestamps) supports this without migration changes.
 
-## Structure de la gem
+## Gem structure
 
 ```
 userpattern/
@@ -271,12 +265,12 @@ userpattern/
 ├── lib/
 │   ├── userpattern.rb
 │   ├── userpattern/
-│   │   ├── anonymizer.rb        # HMAC anonymization
-│   │   ├── buffer.rb            # Thread-safe in-memory buffer
-│   │   ├── configuration.rb     # Configuration DSL
+│   │   ├── anonymizer.rb          # HMAC anonymization
+│   │   ├── buffer.rb              # Thread-safe in-memory buffer
+│   │   ├── configuration.rb       # Configuration DSL
 │   │   ├── controller_tracking.rb # after_action concern
-│   │   ├── engine.rb            # Rails Engine
-│   │   ├── stats_calculator.rb  # SQL-agnostic stats computation
+│   │   ├── engine.rb              # Rails Engine
+│   │   ├── stats_calculator.rb    # SQL-agnostic stats computation
 │   │   └── version.rb
 │   ├── generators/userpattern/
 │   │   ├── install_generator.rb
@@ -286,6 +280,6 @@ userpattern/
 └── README.md
 ```
 
-## Licence
+## License
 
 MIT

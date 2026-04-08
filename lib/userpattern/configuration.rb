@@ -18,10 +18,12 @@ module UserPattern
       @ignored_paths = []
     end
 
-    # DSL method: config.track "Admin", current_method: :current_admin
-    def track(model_name, current_method: nil)
-      method_name = current_method || :"current_#{model_name.to_s.underscore}"
-      @tracked_models << { name: model_name.to_s, current_method: method_name }
+    def tracked_models=(list)
+      @tracked_models = list.map do |entry|
+        name = entry[:name].to_s
+        method = entry[:current_method] || :"current_#{name.underscore}"
+        { name: name, current_method: method }
+      end
     end
   end
 end
