@@ -56,6 +56,37 @@ RSpec.describe 'Controller tracking', type: :request do
     end
   end
 
+  describe 'ignored paths' do
+    before { TestController.fake_current_user = user }
+
+    context 'with an exact string match' do
+      before { UserPattern.configuration.ignored_paths = ['/test_page'] }
+
+      it 'does not buffer any event' do
+        get '/test_page'
+        expect(UserPattern.buffer.size).to eq(0)
+      end
+    end
+
+    context 'with a regexp match' do
+      before { UserPattern.configuration.ignored_paths = [%r{\A/test}] }
+
+      it 'does not buffer any event' do
+        get '/test_page'
+        expect(UserPattern.buffer.size).to eq(0)
+      end
+    end
+
+    context 'when the path does not match any pattern' do
+      before { UserPattern.configuration.ignored_paths = ['/other', %r{\A/admin}] }
+
+      it 'buffers an event normally' do
+        get '/test_page'
+        expect(UserPattern.buffer.size).to eq(1)
+      end
+    end
+  end
+
   describe 'engine-internal requests' do
     before { TestController.fake_current_user = user }
 
