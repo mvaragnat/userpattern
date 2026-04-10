@@ -23,6 +23,12 @@ module UserPattern
       end
     end
 
+    initializer 'userpattern.alert_mode' do
+      config.after_initialize do
+        UserPattern.start_alert_mode! if UserPattern.configuration.alert_mode?
+      end
+    end
+
     initializer 'userpattern.cleanup_task' do
       config.after_initialize do
         load File.expand_path('../tasks/userpattern.rake', __dir__) if defined?(Rake)

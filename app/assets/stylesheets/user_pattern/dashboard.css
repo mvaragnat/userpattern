@@ -20,6 +20,38 @@ header {
 header h1 { font-size: 1.6rem; font-weight: 700; }
 header .version { color: #888; font-size: 0.85rem; }
 
+.mode-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.2rem 0.6rem;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.mode-badge.collection { background: #dbeafe; color: #1d4ed8; }
+.mode-badge.alert { background: #fee2e2; color: #dc2626; }
+
+.page-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.page-tabs a {
+  display: inline-block;
+  padding: 0.5rem 1.25rem;
+  text-decoration: none;
+  color: #555;
+  font-weight: 600;
+  background: #e2e8f0;
+  border-radius: 6px 6px 0 0;
+  transition: color 0.15s, background 0.15s;
+}
+
+.page-tabs a:hover { background: #cbd5e1; color: #1a1a2e; }
+.page-tabs a.active { background: #fff; color: #2563eb; }
+
 .tabs {
   display: flex;
   gap: 0.25rem;
@@ -40,6 +72,27 @@ header .version { color: #888; font-size: 0.85rem; }
 
 .tabs a:hover { color: #1a1a2e; }
 .tabs a.active { color: #2563eb; border-bottom-color: #2563eb; }
+
+.filter-bar {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.filter-bar a {
+  display: inline-block;
+  padding: 0.35rem 0.9rem;
+  text-decoration: none;
+  color: #555;
+  font-size: 0.85rem;
+  font-weight: 500;
+  background: #e2e8f0;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.filter-bar a:hover { background: #cbd5e1; }
+.filter-bar a.active { background: #2563eb; color: #fff; }
 
 .card {
   background: #fff;
@@ -84,16 +137,28 @@ th.sorted-desc .arrow::after { content: "\25BC"; color: #2563eb; }
 th:not(.sorted-asc):not(.sorted-desc) .arrow::after { content: "\25B4\25BE"; }
 
 td.endpoint { font-family: "SF Mono", Monaco, "Cascadia Code", monospace; font-size: 0.85rem; }
+td.mono { font-family: "SF Mono", Monaco, "Cascadia Code", monospace; font-size: 0.85rem; color: #64748b; }
 
 td.num { text-align: right; font-variant-numeric: tabular-nums; }
 th.num { text-align: right; }
 
+td.threshold { color: #9333ea; font-weight: 500; }
+td.violation-exceeded { color: #dc2626; font-weight: 600; }
+
 tbody tr:hover { background: #f1f5f9; }
+tr.violation-row:hover { background: #fef2f2; }
 
 .empty-state {
   text-align: center;
   padding: 4rem 2rem;
   color: #94a3b8;
+}
+
+.empty-state code {
+  background: #f1f5f9;
+  padding: 0.15rem 0.4rem;
+  border-radius: 3px;
+  font-size: 0.85rem;
 }
 
 .footer {

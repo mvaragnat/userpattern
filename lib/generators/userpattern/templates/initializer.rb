@@ -27,22 +27,43 @@ UserPattern.configure do |config|
   # config.retention_period = 30  # days
 
   # ─── Dashboard authentication ──────────────────────────────────────
-  # Protect the dashboard. The Proc runs in the controller context.
+  # The dashboard is secure by default. Set these environment variables:
+  #   USERPATTERN_DASHBOARD_USER
+  #   USERPATTERN_DASHBOARD_PASSWORD
   #
-  # Example with HTTP Basic Auth:
-  #   config.dashboard_auth = -> {
-  #     authenticate_or_request_with_http_basic("UserPattern") do |user, pass|
-  #       ActiveSupport::SecurityUtils.secure_compare(user, "admin") &
-  #         ActiveSupport::SecurityUtils.secure_compare(pass, ENV["USERPATTERN_PASSWORD"])
-  #     end
-  #   }
-  #
-  # Example with Devise:
+  # Or provide a custom Proc:
   #   config.dashboard_auth = -> {
   #     redirect_to main_app.root_path unless current_user&.admin?
   #   }
-  #
-  config.dashboard_auth = nil
+
+  # ─── Mode ──────────────────────────────────────────────────────────
+  # :collection — observe and record usage patterns (default)
+  # :alert      — enforce rate limits derived from observed data
+  # config.mode = :collection
+
+  # ─── Alert mode settings ───────────────────────────────────────────
+  # config.threshold_multiplier = 1.5       # limit = observed_max * multiplier
+  # config.threshold_refresh_interval = 300 # reload limits from DB every N seconds
+  # config.block_unknown_endpoints = false  # allow endpoints not seen during collection
+
+  # Cache store for rate-limiter counters (defaults to Rails.cache).
+  # For multi-process setups, use Redis:
+  # config.rate_limiter_store = ActiveSupport::Cache::RedisCacheStore.new(url: ENV["REDIS_URL"])
+
+  # Actions to take when a threshold is exceeded (combine multiple):
+  #   :raise   — raise ThresholdExceeded (handle via rescue_from)
+  #   :log     — write to Rails.logger
+  #   :record  — persist to userpattern_violations table (visible in dashboard)
+  #   :logout  — call config.logout_method to terminate the session
+  # config.violation_actions = [:raise]
+
+  # Logout method (only used when :logout is in violation_actions):
+  # config.logout_method = ->(controller) { controller.sign_out(controller.current_user) }
+
+  # Optional callback for custom handling (Sentry, Slack, etc.):
+  # config.on_threshold_exceeded = ->(violation) {
+  #   Sentry.capture_message("Rate limit: #{violation.message}")
+  # }
 
   # ─── Enable / disable ─────────────────────────────────────────────
   # config.enabled = true
