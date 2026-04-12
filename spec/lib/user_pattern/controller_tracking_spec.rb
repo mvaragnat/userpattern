@@ -95,4 +95,39 @@ RSpec.describe 'Controller tracking', type: :request do
       expect(UserPattern.buffer.size).to eq(0)
     end
   end
+
+  describe 'when tracked method raises an error' do
+    before do
+      TestController.fake_current_user = user
+      allow_any_instance_of(TestController).to receive(:current_user).and_raise(StandardError, 'auth failure')
+    end
+
+    it 'silently ignores the error and buffers no event' do
+      get '/test_page'
+      expect(UserPattern.buffer.size).to eq(0)
+    end
+  end
+
+  describe 'when tracked method does not exist on the controller' do
+    before do
+      UserPattern.configuration.tracked_models = [{ name: 'Admin', current_method: :current_admin }]
+    end
+
+    it 'does not buffer any event' do
+      get '/test_page'
+      expect(UserPattern.buffer.size).to eq(0)
+    end
+  end
+
+  describe 'ignored paths with non-string/non-regexp pattern' do
+    before do
+      TestController.fake_current_user = user
+      UserPattern.configuration.ignored_paths = [:symbol_pattern]
+    end
+
+    it 'does not match the pattern and buffers an event normally' do
+      get '/test_page'
+      expect(UserPattern.buffer.size).to eq(1)
+    end
+  end
 end

@@ -68,6 +68,13 @@ RSpec.describe 'Dashboard', type: :request do
 
       expect(response.body).to include('3 events in store')
     end
+
+    it 'ignores a sort parameter when there are no stats' do
+      get '/userpatterns', params: { sort: 'total_requests' }
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include('No data collected yet')
+    end
   end
 
   describe 'GET /userpatterns/stylesheet' do

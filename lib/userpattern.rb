@@ -37,4 +37,6 @@ module UserPattern
   end
 end
 
+# :nocov:
 require 'userpattern/engine' if defined?(Rails::Engine)
+# :nocov:
