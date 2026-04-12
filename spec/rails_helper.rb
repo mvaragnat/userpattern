@@ -74,6 +74,8 @@ RSpec.configure do |config|
     UserPattern.configuration.anonymous_salt = 'test_salt_32chars_for_hmac_key!!'
     UserPattern.configuration.flush_interval = 99_999
     TestController.fake_current_user = nil
+    UserPattern::RequestEvent.delete_all
+    UserPattern::Violation.delete_all
   end
 
   config.after(:suite) do

@@ -44,10 +44,7 @@ module UserPattern
     end
 
     def authenticate_dashboard!
-      auth = UserPattern.configuration.dashboard_auth
-      return unless auth.is_a?(Proc)
-
-      instance_exec(&auth)
+      instance_exec(&UserPattern.configuration.dashboard_auth)
     end
 
     def apply_sort!

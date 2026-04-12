@@ -64,5 +64,34 @@ RSpec.describe UserPattern::RateLimiter do
         end.to raise_error(UserPattern::ThresholdExceeded)
       end
     end
+
+    context 'when a period limit is nil' do
+      before do
+        allow(threshold_cache).to receive(:limits_for)
+          .with('User', 'GET /partial')
+          .and_return({ per_minute: nil, per_hour: 10, per_day: 50 })
+      end
+
+      it 'skips the nil-limit period and checks others' do
+        expect do
+          limiter.check_and_increment!(42, 'User', 'GET /partial')
+        end.not_to raise_error
+      end
+    end
+
+    context 'when cache store returns nil on increment' do
+      let(:nil_store) { ActiveSupport::Cache::MemoryStore.new }
+      let(:nil_limiter) { described_class.new(store: nil_store, threshold_cache: threshold_cache) }
+
+      it 'falls back to write and returns 1' do
+        allow(nil_store).to receive(:increment).and_return(nil)
+        allow(nil_store).to receive(:write)
+
+        expect do
+          nil_limiter.check_and_increment!(42, 'User', 'GET /api/test')
+        end.not_to raise_error
+        expect(nil_store).to have_received(:write).at_least(:once)
+      end
+    end
   end
 end

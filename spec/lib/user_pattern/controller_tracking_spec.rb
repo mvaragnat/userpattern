@@ -59,6 +59,28 @@ RSpec.describe 'Controller tracking', type: :request do
       end
     end
 
+    describe 'ignored paths' do
+      before { TestController.fake_current_user = user }
+
+      it 'does not buffer when path matches a string pattern' do
+        UserPattern.configuration.ignored_paths = ['/test_page']
+        get '/test_page'
+        expect(UserPattern.buffer.size).to eq(0)
+      end
+
+      it 'does not buffer when path matches a regexp pattern' do
+        UserPattern.configuration.ignored_paths = [%r{\A/test}]
+        get '/test_page'
+        expect(UserPattern.buffer.size).to eq(0)
+      end
+
+      it 'buffers normally when path does not match any pattern' do
+        UserPattern.configuration.ignored_paths = ['/other', %r{\A/admin}]
+        get '/test_page'
+        expect(UserPattern.buffer.size).to eq(1)
+      end
+    end
+
     describe 'engine-internal requests' do
       before do
         TestController.fake_current_user = user
@@ -130,6 +152,79 @@ RSpec.describe 'Controller tracking', type: :request do
 
         expect(callback_called).to be true
       end
+    end
+
+    context 'with :logout action' do
+      it 'calls the logout method' do
+        logout_called = false
+        UserPattern.configuration.violation_actions = [:logout]
+        UserPattern.configuration.logout_method = ->(_controller) { logout_called = true }
+
+        3.times { get '/test_page' }
+
+        expect(logout_called).to be true
+      end
+    end
+
+    context 'with :logout action but no logout_method' do
+      it 'does not raise when logout_method is nil' do
+        UserPattern.configuration.violation_actions = [:logout]
+        UserPattern.configuration.logout_method = nil
+
+        3.times { get '/test_page' }
+
+        expect(response).to have_http_status(:ok)
+      end
+    end
+
+    context 'when the user is nil for a tracked model' do
+      before do
+        TestController.fake_current_user = nil
+      end
+
+      it 'skips rate limiting for unauthenticated requests' do
+        get '/test_page'
+        expect(response).to have_http_status(:ok)
+      end
+    end
+  end
+
+  describe 'when tracked method raises an error' do
+    before do
+      TestController.fake_current_user = user
+      TestController.define_method(:current_user) { raise StandardError, 'auth failure' }
+    end
+
+    after do
+      TestController.define_method(:current_user) { self.class.fake_current_user }
+    end
+
+    it 'silently ignores the error and buffers no event' do
+      get '/test_page'
+      expect(UserPattern.buffer.size).to eq(0)
+    end
+  end
+
+  describe 'when tracked method does not exist on the controller' do
+    before do
+      UserPattern.configuration.tracked_models = [{ name: 'Admin', current_method: :current_admin }]
+    end
+
+    it 'does not buffer any event' do
+      get '/test_page'
+      expect(UserPattern.buffer.size).to eq(0)
+    end
+  end
+
+  describe 'ignored paths with non-string/non-regexp pattern' do
+    before do
+      TestController.fake_current_user = user
+      UserPattern.configuration.ignored_paths = [:symbol_pattern]
+    end
+
+    it 'does not match the pattern and buffers an event normally' do
+      get '/test_page'
+      expect(UserPattern.buffer.size).to eq(1)
     end
   end
 end

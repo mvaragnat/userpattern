@@ -65,6 +65,19 @@ UserPattern.configure do |config|
   #   Sentry.capture_message("Rate limit: #{violation.message}")
   # }
 
+  # ─── Ignored paths ────────────────────────────────────────────────
+  # Paths matching any entry are silently skipped — no event is recorded.
+  # Each entry can be a String (exact match) or a Regexp (pattern match).
+  # Matching is performed against the raw request path (no query string).
+  #
+  # Examples:
+  #   config.ignored_paths = [
+  #     "/health",            # exact match
+  #     "/up",
+  #     %r{\A/api/internal},  # any path starting with /api/internal
+  #   ]
+  # config.ignored_paths = []
+
   # ─── Enable / disable ─────────────────────────────────────────────
   # config.enabled = true
 end

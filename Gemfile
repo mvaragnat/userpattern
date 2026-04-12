@@ -9,5 +9,6 @@ group :development, :test do
   gem 'rspec-rails'
   gem 'rubocop', require: false
   gem 'rubocop-rspec', require: false
+  gem 'simplecov', require: false
   gem 'sqlite3'
 end

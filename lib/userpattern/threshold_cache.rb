@@ -56,14 +56,18 @@ module UserPattern
     def safe_refresh
       refresh!
     rescue StandardError => e
+      # :nocov:
       Rails.logger&.error("[UserPattern] Threshold refresh error: #{e.message}")
+      # :nocov:
     end
 
+    # :nocov:
     def start_refresh_timer
       @timer = Concurrent::TimerTask.new(
         execution_interval: UserPattern.configuration.threshold_refresh_interval
       ) { safe_refresh }
       @timer.execute
     end
+    # :nocov:
   end
 end

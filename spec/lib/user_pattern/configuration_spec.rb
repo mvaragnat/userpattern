@@ -18,6 +18,10 @@ RSpec.describe UserPattern::Configuration do
       expect(config.enabled).to be true
     end
 
+    it 'has no ignored paths' do
+      expect(config.ignored_paths).to eq([])
+    end
+
     it 'retains data for 30 days' do
       expect(config.retention_period).to eq(30)
     end

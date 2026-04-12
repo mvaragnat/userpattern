@@ -123,6 +123,34 @@ RSpec.describe 'Dashboard', type: :request do
       get '/userpatterns'
       expect(response.body).to include('Collection Mode')
     end
+
+    it 'ignores a sort parameter when there are no stats' do
+      get '/userpatterns', params: { sort: 'total_requests' }
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include('No data collected yet')
+    end
+
+    context 'when in alert mode with threshold data' do
+      before do
+        UserPattern.configuration.mode = :alert
+        create_event(endpoint: 'GET /api/items')
+
+        require 'userpattern/threshold_cache'
+        cache = instance_double(UserPattern::ThresholdCache)
+        allow(cache).to receive(:all_limits).and_return(
+          { ['User', 'GET /api/items'] => { per_minute: 8, per_hour: 45, per_day: 150 } }
+        )
+        allow(UserPattern).to receive(:threshold_cache).and_return(cache)
+      end
+
+      it 'shows threshold limit columns' do
+        get '/userpatterns'
+
+        expect(response.body).to include('Alert Mode')
+        expect(response.body).to include('Limit / Min')
+      end
+    end
   end
 
   describe 'GET /userpatterns/violations' do
@@ -152,6 +180,26 @@ RSpec.describe 'Dashboard', type: :request do
 
       expect(response.body).to include('GET /recent')
       expect(response.body).not_to include('GET /api/test')
+    end
+
+    it 'filters violations by model type' do
+      create_violation(model_type: 'User', endpoint: 'GET /user_action')
+      create_violation(model_type: 'Admin', endpoint: 'GET /admin_action')
+
+      get '/userpatterns/violations', params: { model_type: 'Admin' }
+
+      expect(response.body).to include('GET /admin_action')
+      expect(response.body).not_to include('GET /user_action')
+    end
+
+    it 'accepts a custom days parameter' do
+      create_violation(occurred_at: 20.days.ago, endpoint: 'GET /old')
+      create_violation(occurred_at: 1.day.ago, endpoint: 'GET /recent')
+
+      get '/userpatterns/violations', params: { days: 30 }
+
+      expect(response.body).to include('GET /old')
+      expect(response.body).to include('GET /recent')
     end
   end
 

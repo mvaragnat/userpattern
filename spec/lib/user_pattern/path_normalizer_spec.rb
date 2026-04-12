@@ -88,5 +88,15 @@ RSpec.describe UserPattern::PathNormalizer do
         expect(described_class.normalize('/')).to eq('/')
       end
     end
+
+    context 'with edge-case query strings' do
+      it 'preserves bare keys with no value' do
+        expect(described_class.normalize('/search?flag')).to eq('/search?flag')
+      end
+
+      it 'preserves keys with empty values' do
+        expect(described_class.normalize('/search?q=')).to eq('/search?q=')
+      end
+    end
   end
 end

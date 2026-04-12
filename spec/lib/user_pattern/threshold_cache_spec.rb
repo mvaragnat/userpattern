@@ -79,4 +79,27 @@ RSpec.describe UserPattern::ThresholdCache do
       expect(all.keys).to contain_exactly(['User', 'GET /a'], ['Admin', 'GET /b'])
     end
   end
+
+  describe '#safe_refresh error handling' do
+    it 'logs an error when StatsCalculator raises' do
+      allow(UserPattern::StatsCalculator).to receive(:compute_all).and_raise(StandardError, 'db gone')
+      allow(Rails.logger).to receive(:error)
+
+      cache.send(:safe_refresh)
+
+      expect(Rails.logger).to have_received(:error).with(/Threshold refresh error: db gone/).at_least(:once)
+    end
+  end
+
+  describe '#shutdown' do
+    it 'stops the refresh timer' do
+      cache.shutdown
+      expect(cache.instance_variable_get(:@timer)).to be_shutdown
+    end
+
+    it 'handles nil timer gracefully' do
+      cache.instance_variable_set(:@timer, nil)
+      expect { cache.shutdown }.not_to raise_error
+    end
+  end
 end

@@ -41,6 +41,14 @@ RSpec.describe UserPattern::ViolationRecorder do
       expect(record.count).to eq(9)
       expect(record.limit).to eq(8)
     end
+
+    it 'logs and swallows errors instead of raising' do
+      allow(UserPattern::Violation).to receive(:create!).and_raise(ActiveRecord::RecordInvalid)
+      allow(Rails.logger).to receive(:error)
+
+      expect { described_class.record!(violation) }.not_to raise_error
+      expect(Rails.logger).to have_received(:error).with(/Violation record error/)
+    end
   end
 
   describe '.anonymize_user_id' do

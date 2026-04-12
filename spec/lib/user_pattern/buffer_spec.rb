@@ -65,6 +65,76 @@ RSpec.describe UserPattern::Buffer do
     end
   end
 
+  describe '#push with buffer size exceeded' do
+    it 'triggers async flush when buffer size is reached' do
+      UserPattern.configuration.buffer_size = 1
+      buf = described_class.new
+      buf.push(event)
+      buf.shutdown
+
+      expect(UserPattern::RequestEvent.count).to eq(1)
+    end
+  end
+
+  describe '#flush concurrent guard' do
+    it 'is a no-op when another flush is in progress' do
+      buffer.push(event)
+
+      flushing = buffer.instance_variable_get(:@flushing)
+      flushing.make_true
+      buffer.flush
+
+      expect(UserPattern::RequestEvent.count).to eq(0)
+
+      flushing.make_false
+      buffer.flush
+      expect(UserPattern::RequestEvent.count).to eq(1)
+    end
+  end
+
+  describe '#flush with persistence error' do
+    it 'logs the error and does not raise' do
+      allow(UserPattern::RequestEvent).to receive(:insert_all).and_raise(StandardError, 'db error')
+      buffer.push(event)
+
+      expect(Rails.logger).to receive(:error).with(/Flush error/)
+      expect { buffer.flush }.not_to raise_error
+    end
+  end
+
+  describe 'timer-based flush' do
+    it 'starts a timer that calls flush periodically' do
+      timer_block = nil
+      fake_timer = instance_double(Concurrent::TimerTask, execute: nil, shutdown: nil)
+
+      allow(Concurrent::TimerTask).to receive(:new) do |**_opts, &block|
+        timer_block = block
+        fake_timer
+      end
+
+      buf = described_class.new
+      buf.push(event)
+      timer_block.call
+
+      expect(UserPattern::RequestEvent.count).to eq(1)
+      buf.shutdown
+    end
+
+    it 'handles nil timer gracefully on shutdown' do
+      buf = described_class.new
+      buf.instance_variable_set(:@timer, nil)
+      expect { buf.shutdown }.not_to raise_error
+    end
+  end
+
+  describe 'persist_events with empty drain' do
+    it 'is a no-op when drain_queue returns empty' do
+      buf = described_class.new
+      expect(UserPattern::RequestEvent).not_to receive(:insert_all)
+      buf.send(:persist_events)
+    end
+  end
+
   describe '#shutdown' do
     it 'flushes remaining events before stopping' do
       buffer.push(event)

@@ -16,6 +16,7 @@ module UserPattern
       end
     end
 
+    # :nocov:
     initializer 'userpattern.default_salt' do
       config.after_initialize do
         UserPattern.configuration.anonymous_salt ||=
@@ -34,5 +35,6 @@ module UserPattern
         load File.expand_path('../tasks/userpattern.rake', __dir__) if defined?(Rake)
       end
     end
+    # :nocov:
   end
 end
