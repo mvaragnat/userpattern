@@ -78,4 +78,45 @@ RSpec.describe UserPattern::StatsCalculator do
       expect(stat[:avg_per_minute]).to be > 0
     end
   end
+
+  describe 'adapter-specific SQL generation' do
+    let(:calculator) { described_class.new }
+
+    context 'with a PostgreSQL adapter' do
+      before { allow(calculator).to receive(:connection_adapter).and_return('postgresql') }
+
+      it 'generates date_trunc expressions' do
+        expect(calculator.send(:bucket_expression, :minute)).to eq("date_trunc('minute', recorded_at)")
+        expect(calculator.send(:bucket_expression, :hour)).to eq("date_trunc('hour', recorded_at)")
+        expect(calculator.send(:bucket_expression, :day)).to eq("date_trunc('day', recorded_at)")
+      end
+    end
+
+    context 'with a MySQL adapter' do
+      before { allow(calculator).to receive(:connection_adapter).and_return('mysql') }
+
+      it 'generates DATE_FORMAT expressions' do
+        expect(calculator.send(:bucket_expression, :minute)).to eq("DATE_FORMAT(recorded_at, '%Y-%m-%d %H:%i')")
+        expect(calculator.send(:bucket_expression, :hour)).to eq("DATE_FORMAT(recorded_at, '%Y-%m-%d %H')")
+        expect(calculator.send(:bucket_expression, :day)).to eq("DATE_FORMAT(recorded_at, '%Y-%m-%d')")
+      end
+    end
+  end
+
+  describe 'edge cases' do
+    let(:calculator) { described_class.new }
+
+    it 'returns 1.0 for time span when timestamps are nil' do
+      expect(calculator.send(:time_span_seconds, nil, Time.current)).to eq(1.0)
+      expect(calculator.send(:time_span_seconds, Time.current, nil)).to eq(1.0)
+    end
+
+    it 'returns 0.0 from safe_divide when denominator is zero' do
+      expect(calculator.send(:safe_divide, 10, 0)).to eq(0.0)
+    end
+
+    it 'returns 0.0 from safe_divide when denominator is nil' do
+      expect(calculator.send(:safe_divide, 10, nil)).to eq(0.0)
+    end
+  end
 end

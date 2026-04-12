@@ -99,5 +99,33 @@ RSpec.describe UserPattern::Anonymizer do
 
       expect(result_a).not_to eq(result_b)
     end
+
+    it 'raises a TypeError for an unknown detection mode' do
+      UserPattern.configuration.session_detection = :unknown_mode
+
+      # The case statement returns nil for unrecognised modes; HMAC raises when passed nil
+      expect { described_class.anonymize(request) }.to raise_error(TypeError)
+    end
+  end
+
+  describe 'auto-detection with unusual session objects' do
+    context 'when request has no session method' do
+      let(:session_less_request) do
+        Struct.new(:headers, :remote_ip, keyword_init: true).new(headers: {}, remote_ip: '10.0.0.1')
+      end
+
+      it 'falls back to remote IP' do
+        expect(described_class.anonymize(session_less_request)).to match(/\A[0-9a-f]{16}\z/)
+      end
+    end
+
+    context 'when session has no id method' do
+      let(:id_less_session) { Struct.new(:type).new(:test) }
+      let(:request) { FakeRequest.new(headers: {}, session: id_less_session, remote_ip: '10.0.0.1') }
+
+      it 'falls back to remote IP' do
+        expect(described_class.anonymize(request)).to match(/\A[0-9a-f]{16}\z/)
+      end
+    end
   end
 end
