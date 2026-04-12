@@ -16,6 +16,7 @@ module UserPattern
     def _userpattern_track_request
       return unless UserPattern.enabled?
       return if _userpattern_internal_request?
+      return if _userpattern_ignored_path?
 
       _userpattern_record_matching_models
     end
@@ -44,6 +45,16 @@ module UserPattern
 
     def _userpattern_internal_request?
       self.class.name.to_s.start_with?('UserPattern::')
+    end
+
+    def _userpattern_ignored_path?
+      path = request.path
+      UserPattern.configuration.ignored_paths.any? do |pattern|
+        case pattern
+        when Regexp then pattern.match?(path)
+        when String then pattern == path
+        end
+      end
     end
   end
 end
