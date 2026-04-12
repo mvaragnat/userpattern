@@ -68,6 +68,35 @@ RSpec.describe UserPattern::StatsCalculator do
       expect(stat[:max_per_day]).to eq(3)
     end
 
+    context 'with ignored_paths configured' do
+      before do
+        UserPattern.configuration.ignored_paths = ['/dashboard', %r{\A/admin}]
+      end
+
+      it 'excludes endpoints whose path matches an exact ignored string' do
+        create_event(endpoint: 'GET /dashboard')
+        create_event(endpoint: 'GET /profile')
+
+        paths = described_class.compute_all.map { |s| s[:endpoint] }
+        expect(paths).not_to include('GET /dashboard')
+        expect(paths).to include('GET /profile')
+      end
+
+      it 'excludes endpoints whose path matches an ignored regexp' do
+        create_event(endpoint: 'GET /admin/users')
+        create_event(endpoint: 'GET /profile')
+
+        paths = described_class.compute_all.map { |s| s[:endpoint] }
+        expect(paths).not_to include('GET /admin/users')
+        expect(paths).to include('GET /profile')
+      end
+
+      it 'returns an empty array when all endpoints are ignored' do
+        create_event(endpoint: 'GET /dashboard')
+        expect(described_class.compute_all).to eq([])
+      end
+    end
+
     it 'computes avg_per_minute across the observed time span' do
       base = Time.utc(2026, 1, 1, 12, 0, 0)
       create_event(recorded_at: base)

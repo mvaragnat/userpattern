@@ -27,5 +27,14 @@ module UserPattern
         { name: name, current_method: method }
       end
     end
+
+    def ignored?(path)
+      ignored_paths.any? do |pattern|
+        case pattern
+        when Regexp then pattern.match?(path)
+        when String then pattern == path
+        end
+      end
+    end
   end
 end
