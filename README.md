@@ -464,15 +464,17 @@ Counters expire automatically (`2.minutes`, `2.hours`, `2.days`) — no cleanup 
 
 ### Privacy in alert mode
 
-```
-DB: userpattern_request_events  → anonymous_session_id (HMAC, no user ID)
-DB: userpattern_violations      → user_identifier (HMAC hash, not raw ID)
-Cache (ephemeral)               → user.id in counter keys (expires automatically)
-ThresholdExceeded exception     → user.id in message (handled by host app)
-Rails.logger                    → user.id if :log action is enabled
-```
+Alert mode introduces two new locations where user-related data appears. Neither breaks the anonymization guarantee of the collection layer.
 
-Raw user IDs never reach the database. They exist only in ephemeral cache keys, exceptions, and logs — all controlled by the host app.
+| Location | What is stored | Lifetime | Contains raw user ID? |
+|---|---|---|---|
+| `userpattern_request_events` (DB) | `anonymous_session_id` — HMAC hash of session/JWT | Retained until cleanup | No |
+| `userpattern_violations` (DB) | `user_identifier` — HMAC hash of `"ModelType:user.id"` | Permanent | No |
+| Cache store (Redis / memory) | Counter keys containing `user.id` | Expires automatically (2 min – 2 days) | Yes, but ephemeral |
+| `ThresholdExceeded` exception | `user_id` attribute in the exception object | Request lifetime | Yes, in-memory only |
+| `Rails.logger` | `user.id` in the log message (if `:log` action is enabled) | Depends on log retention | Yes |
+
+**The database never contains a raw user ID.** Violations use a one-way HMAC hash (`user_identifier`), different from the `anonymous_session_id` used for collection, so the two cannot be correlated. Raw user IDs only exist in ephemeral contexts (cache keys, exceptions, logs) whose retention is controlled by the host application.
 
 ## Gem structure
 
