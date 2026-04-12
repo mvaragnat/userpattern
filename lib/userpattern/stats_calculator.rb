@@ -7,10 +7,18 @@ module UserPattern
     end
 
     def compute_all
-      load_groups.map { |row| build_stat(row) }
+      load_groups
+        .reject { |row| ignored_endpoint?(row[1]) }
+        .map { |row| build_stat(row) }
     end
 
     private
+
+    def ignored_endpoint?(endpoint)
+      # endpoint format: "VERB /path" — match only against the path part
+      path = endpoint.split(' ', 2).last.to_s
+      UserPattern.configuration.ignored?(path)
+    end
 
     def load_groups
       RequestEvent

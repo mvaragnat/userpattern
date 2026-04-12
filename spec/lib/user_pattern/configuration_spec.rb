@@ -35,6 +35,30 @@ RSpec.describe UserPattern::Configuration do
     end
   end
 
+  describe '#ignored?' do
+    it 'returns false when ignored_paths is empty' do
+      expect(config.ignored?('/health')).to be false
+    end
+
+    it 'matches an exact string' do
+      config.ignored_paths = ['/health', '/up']
+      expect(config.ignored?('/health')).to be true
+      expect(config.ignored?('/up')).to be true
+      expect(config.ignored?('/other')).to be false
+    end
+
+    it 'does not partial-match strings' do
+      config.ignored_paths = ['/health']
+      expect(config.ignored?('/health/deep')).to be false
+    end
+
+    it 'matches a regexp' do
+      config.ignored_paths = [%r{\A/api/internal}]
+      expect(config.ignored?('/api/internal/status')).to be true
+      expect(config.ignored?('/api/public')).to be false
+    end
+  end
+
   describe '#tracked_models=' do
     it 'normalizes entries with explicit current_method' do
       config.tracked_models = [{ name: 'Admin', current_method: :current_admin }]

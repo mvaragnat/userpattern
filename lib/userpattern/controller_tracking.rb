@@ -48,13 +48,7 @@ module UserPattern
     end
 
     def _userpattern_ignored_path?
-      path = request.path
-      UserPattern.configuration.ignored_paths.any? do |pattern|
-        case pattern
-        when Regexp then pattern.match?(path)
-        when String then pattern == path
-        end
-      end
+      UserPattern.configuration.ignored?(request.path)
     end
   end
 end
