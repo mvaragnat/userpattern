@@ -42,6 +42,15 @@ module UserPattern
       end
     end
 
+    def ignored?(path)
+      ignored_paths.any? do |pattern|
+        case pattern
+        when Regexp then pattern.match?(path)
+        when String then pattern == path
+        end
+      end
+    end
+
     private
 
     def initialize_alert_defaults
@@ -79,13 +88,6 @@ module UserPattern
             ActiveSupport::SecurityUtils.secure_compare(provided_pass, pass)
         end
       }
-    def ignored?(path)
-      ignored_paths.any? do |pattern|
-        case pattern
-        when Regexp then pattern.match?(path)
-        when String then pattern == path
-        end
-      end
     end
   end
 end
