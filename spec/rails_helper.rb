@@ -15,6 +15,7 @@ module Dummy
     config.eager_load = false
     config.secret_key_base = 'test_secret_key_base_for_userpattern_specs_abcdef1234567890'
     config.hosts.clear
+    config.action_dispatch.show_exceptions = :none
     config.logger = Logger.new(nil)
     config.active_record.maintain_test_schema = false
   end
@@ -30,6 +31,17 @@ ActiveRecord::Schema.define do
     t.string   :anonymous_session_id, null: false
     t.datetime :recorded_at,          null: false
     t.datetime :created_at,           null: false
+  end
+
+  create_table :userpattern_violations, force: true do |t|
+    t.string   :model_type,      null: false
+    t.string   :endpoint,        null: false
+    t.string   :period,          null: false
+    t.integer  :count,           null: false
+    t.integer  :limit,           null: false
+    t.string   :user_identifier, null: false
+    t.datetime :occurred_at,     null: false
+    t.datetime :created_at,      null: false
   end
 end
 
@@ -62,6 +74,8 @@ RSpec.configure do |config|
     UserPattern.configuration.anonymous_salt = 'test_salt_32chars_for_hmac_key!!'
     UserPattern.configuration.flush_interval = 99_999
     TestController.fake_current_user = nil
+    UserPattern::RequestEvent.delete_all
+    UserPattern::Violation.delete_all
   end
 
   config.after(:suite) do

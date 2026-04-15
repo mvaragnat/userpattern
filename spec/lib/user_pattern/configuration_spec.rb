@@ -33,6 +33,42 @@ RSpec.describe UserPattern::Configuration do
     it 'flushes every 30 seconds' do
       expect(config.flush_interval).to eq(30)
     end
+
+    it 'defaults to collection mode' do
+      expect(config.mode).to eq(:collection)
+      expect(config.alert_mode?).to be false
+    end
+
+    it 'defaults violation_actions to [:raise]' do
+      expect(config.violation_actions).to eq([:raise])
+    end
+
+    it 'defaults threshold_multiplier to 1.5' do
+      expect(config.threshold_multiplier).to eq(1.5)
+    end
+  end
+
+  describe '#alert_mode?' do
+    it 'returns true when mode is :alert' do
+      config.mode = :alert
+      expect(config.alert_mode?).to be true
+    end
+
+    it 'returns false when mode is :collection' do
+      expect(config.alert_mode?).to be false
+    end
+  end
+
+  describe '#dashboard_auth' do
+    it 'returns a 403 proc when no env vars are set' do
+      expect(config.dashboard_auth).to be_a(Proc)
+    end
+
+    it 'returns a custom proc when explicitly set' do
+      custom = -> { 'custom' }
+      config.dashboard_auth = custom
+      expect(config.dashboard_auth).to eq(custom)
+    end
   end
 
   describe '#ignored?' do

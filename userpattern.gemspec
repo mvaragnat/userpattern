@@ -12,7 +12,7 @@ Gem::Specification.new do |spec|
   spec.description = 'Track and analyze endpoint usage patterns of logged-in users ' \
                      'with full anonymization. Provides a sortable dashboard with ' \
                      'per-model-type frequency statistics.'
-  spec.homepage = 'https://github.com/userpattern/userpattern'
+  spec.homepage = 'https://github.com/mvaragnat/userpattern'
   spec.license = 'MIT'
   spec.required_ruby_version = '>= 3.2'
 

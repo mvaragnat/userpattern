@@ -10,4 +10,11 @@ RSpec.describe UserPattern::Engine do
       expect(api_class.ancestors).to include(UserPattern::ControllerTracking)
     end
   end
+
+  describe 'alert_mode initializer' do
+    it 'does not start alert mode in collection mode' do
+      expect(UserPattern.threshold_cache).to be_nil
+      expect(UserPattern.rate_limiter).to be_nil
+    end
+  end
 end

@@ -11,7 +11,17 @@
     <header>
       <h1>UserPattern</h1>
       <span class="version">v<%= UserPattern::VERSION %></span>
+      <% if @alert_mode %>
+        <span class="mode-badge alert">Alert Mode</span>
+      <% else %>
+        <span class="mode-badge collection">Collection Mode</span>
+      <% end %>
     </header>
+
+    <nav class="page-tabs">
+      <a href="<%= user_pattern.root_path %>" class="active">Usage</a>
+      <a href="<%= user_pattern.violations_path %>">Violations</a>
+    </nav>
 
     <% if @model_types.any? %>
       <nav class="tabs">
@@ -59,10 +69,16 @@
                   </a>
                 </th>
               <% end %>
+              <% if @alert_mode %>
+                <th class="num">Limit / Min</th>
+                <th class="num">Limit / Hour</th>
+                <th class="num">Limit / Day</th>
+              <% end %>
             </tr>
           </thead>
           <tbody>
             <% @filtered_stats.each do |stat| %>
+              <% limits = @threshold_limits[[@selected_model, stat[:endpoint]]] || {} %>
               <tr>
                 <td class="endpoint"><%= stat[:endpoint] %></td>
                 <td class="num"><%= stat[:total_requests] %></td>
@@ -72,6 +88,11 @@
                 <td class="num"><%= stat[:max_per_minute] %></td>
                 <td class="num"><%= stat[:max_per_hour] %></td>
                 <td class="num"><%= stat[:max_per_day] %></td>
+                <% if @alert_mode %>
+                  <td class="num threshold"><%= limits[:per_minute] || "—" %></td>
+                  <td class="num threshold"><%= limits[:per_hour] || "—" %></td>
+                  <td class="num threshold"><%= limits[:per_day] || "—" %></td>
+                <% end %>
               </tr>
             <% end %>
           </tbody>
