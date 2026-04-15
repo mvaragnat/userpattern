@@ -476,6 +476,7 @@ Alert mode introduces two new locations where user-related data appears. Neither
 
 **The database never contains a raw user ID.** Violations use a one-way HMAC hash (`user_identifier`), different from the `anonymous_session_id` used for collection, so the two cannot be correlated. Raw user IDs only exist in ephemeral contexts (cache keys, exceptions, logs) whose retention is controlled by the host application.
 
+
 ## Gem structure
 
 ```
