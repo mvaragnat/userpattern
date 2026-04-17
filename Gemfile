@@ -5,7 +5,7 @@ source 'https://rubygems.org'
 gemspec
 
 group :development, :test do
-  gem 'parallel'
+  gem 'parallel', (RUBY_VERSION < '3.3' ? '< 2.0' : '>= 0')
   gem 'rake'
   gem 'rspec-rails'
   gem 'rubocop', require: false

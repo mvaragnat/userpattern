@@ -23,7 +23,9 @@ jobs:
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: ${{ matrix.ruby-version }}
-          bundler-cache: true
+
+      - name: Install dependencies
+        run: bundle install --jobs 4
 
       - name: Run tests with coverage
         run: bundle exec rspec
