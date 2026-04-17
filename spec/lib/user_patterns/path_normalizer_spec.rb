@@ -50,32 +50,29 @@ RSpec.describe UserPatterns::PathNormalizer do
     end
 
     context 'with query string parameters' do
-      it 'redacts numeric values' do
-        expect(described_class.normalize('/admin?user_id=42')).to eq('/admin?user_id=:xxx')
+      it 'strips the entire query string' do
+        expect(described_class.normalize('/admin?user_id=42')).to eq('/admin')
       end
 
-      it 'redacts UUID values' do
+      it 'strips query strings containing UUIDs' do
         path = '/admin?application_id=84ef5373-0e95-4477-bec0-08136fed079a'
-        expect(described_class.normalize(path)).to eq('/admin?application_id=:xxx')
+        expect(described_class.normalize(path)).to eq('/admin')
       end
 
-      it 'preserves non-dynamic query values' do
-        expect(described_class.normalize('/search?status=active')).to eq('/search?status=active')
+      it 'strips non-dynamic query values' do
+        expect(described_class.normalize('/search?status=active')).to eq('/search')
       end
 
-      it 'handles multiple query parameters' do
+      it 'strips multiple query parameters' do
         path = '/api/items?id=123&status=active&token=abcdef1234567890'
-        result = described_class.normalize(path)
-
-        expect(result).to include('id=:xxx')
-        expect(result).to include('status=active')
-        expect(result).to include('token=:xxx')
+        expect(described_class.normalize(path)).to eq('/api/items')
       end
 
-      it 'sorts query parameters for consistent aggregation' do
-        a = described_class.normalize('/search?b=1&a=active')
-        b = described_class.normalize('/search?a=active&b=1')
-        expect(a).to eq(b)
+      it 'groups different query variations into the same endpoint' do
+        a = described_class.normalize('/demands/users?order=name_asc')
+        b = described_class.normalize('/demands/users?order=name_desc')
+        c = described_class.normalize('/demands/users')
+        expect(a).to eq(b).and eq(c)
       end
     end
 
@@ -90,12 +87,12 @@ RSpec.describe UserPatterns::PathNormalizer do
     end
 
     context 'with edge-case query strings' do
-      it 'preserves bare keys with no value' do
-        expect(described_class.normalize('/search?flag')).to eq('/search?flag')
+      it 'strips bare keys with no value' do
+        expect(described_class.normalize('/search?flag')).to eq('/search')
       end
 
-      it 'preserves keys with empty values' do
-        expect(described_class.normalize('/search?q=')).to eq('/search?q=')
+      it 'strips keys with empty values' do
+        expect(described_class.normalize('/search?q=')).to eq('/search')
       end
     end
   end
