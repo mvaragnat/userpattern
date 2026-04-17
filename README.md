@@ -1,8 +1,8 @@
-# UserPattern
+# UserPatterns
 
 Anonymized usage-pattern analysis for Rails applications.
 
-UserPattern plugs into any Rails app as an engine. It intercepts requests from authenticated users, collects per-endpoint frequency statistics, and presents a sortable dashboard — all without ever storing a user identifier. In **alert mode**, it enforces rate limits derived from the observed data.
+UserPatterns plugs into any Rails app as an engine. It intercepts requests from authenticated users, collects per-endpoint frequency statistics, and presents a sortable dashboard — all without ever storing a user identifier. In **alert mode**, it enforces rate limits derived from the observed data.
 
 ## Features
 
@@ -15,11 +15,11 @@ UserPattern plugs into any Rails app as an engine. It intercepts requests from a
 - **Two modes** — collection (observe) and alert (enforce rate limits from observed data).
 - **Secure by default** — dashboard requires authentication out of the box.
 
-## UserPattern vs Rack::Attack
+## UserPatterns vs Rack::Attack
 
-Rack::Attack and UserPattern are **complementary**. Rack::Attack protects against known abuse patterns with manual rules. UserPattern learns what "normal authenticated usage" looks like and detects deviations automatically.
+Rack::Attack and UserPatterns are **complementary**. Rack::Attack protects against known abuse patterns with manual rules. UserPatterns learns what "normal authenticated usage" looks like and detects deviations automatically.
 
-| Aspect | Rack::Attack | UserPattern |
+| Aspect | Rack::Attack | UserPatterns |
 |---|---|---|
 | **Thresholds** | Static, manually configured | Dynamic, learned from observed usage data |
 | **Target** | Any client (usually IP-based) | Authenticated users by model type (User, Admin) |
@@ -31,38 +31,37 @@ Rack::Attack and UserPattern are **complementary**. Rack::Attack protects agains
 
 **When to use Rack::Attack:** IP-level rate limiting, blocking known bad actors, unauthenticated abuse prevention, DDoS protection.
 
-**When to use UserPattern:** Detecting authenticated users who deviate from normal behavior, understanding endpoint usage patterns, adaptive rate limiting without manual threshold tuning.
+**When to use UserPatterns:** Detecting authenticated users who deviate from normal behavior, understanding endpoint usage patterns, adaptive rate limiting without manual threshold tuning.
 
-**Using both together:** Rack::Attack as the outer wall (IP-based, Rack middleware), UserPattern as the inner guard (identity-based, controller-level). UserPattern reuses the same `ActiveSupport::Cache::Store` interface as Rack::Attack for its rate limiter counters, so the two share a common cache infrastructure.
+**Using both together:** Rack::Attack as the outer wall (IP-based, Rack middleware), UserPatterns as the inner guard (identity-based, controller-level). UserPatterns reuses the same `ActiveSupport::Cache::Store` interface as Rack::Attack for its rate limiter counters, so the two share a common cache infrastructure.
 
 ## Installation
 
 Add to your application's `Gemfile`:
 
 ```ruby
-gem "userpattern", path: "path/to/userpattern"   # local development
-# gem "userpattern", github: "your-org/userpattern"  # via GitHub
+gem "user_patterns"
 ```
 
 Run the install generator:
 
 ```bash
 bundle install
-rails generate userpattern:install
+rails generate user_patterns:install
 rails db:migrate
 ```
 
 The generator creates:
-1. `config/initializers/userpattern.rb` — configuration file
-2. Migrations for `userpattern_request_events` and `userpattern_violations` tables
-3. A route mounting the dashboard at `/userpatterns`
+1. `config/initializers/user_patterns.rb` — configuration file
+2. Migrations for `user_patterns_request_events` and `user_patterns_violations` tables
+3. A route mounting the dashboard at `/user_patterns`
 
 ## Configuration
 
 ```ruby
-# config/initializers/userpattern.rb
+# config/initializers/user_patterns.rb
 
-UserPattern.configure do |config|
+UserPatterns.configure do |config|
   # Models to track. Each entry needs :name and optionally :current_method.
   # If :current_method is omitted it defaults to :current_<underscored_name>.
   config.tracked_models = [
@@ -77,7 +76,7 @@ UserPattern.configure do |config|
   config.buffer_size    = 100  # flush when buffer reaches this size
   config.flush_interval = 30   # flush at least every N seconds
 
-  # Data retention (days). Old events are removed by `rake userpattern:cleanup`.
+  # Data retention (days). Old events are removed by `rake user_patterns:cleanup`.
   config.retention_period = 30
 
   # Enable / disable tracking globally
@@ -109,7 +108,7 @@ end
 
 ### Default strategy: `current_user`
 
-UserPattern hooks into controllers via an `after_action` callback. For each configured model it calls the specified method (defaults to `current_user`):
+UserPatterns hooks into controllers via an `after_action` callback. For each configured model it calls the specified method (defaults to `current_user`):
 
 ```ruby
 config.tracked_models = [
@@ -129,7 +128,7 @@ With `devise-jwt` or similar gems, Warden is configured to authenticate via the 
 The flow:
 1. Client sends `Authorization: Bearer <token>`
 2. Warden (via the JWT strategy) decodes the token and hydrates `current_user`
-3. UserPattern calls `current_user` in the `after_action` — the user is detected
+3. UserPatterns calls `current_user` in the `after_action` — the user is detected
 
 ### Custom JWT (without Devise)
 
@@ -152,7 +151,7 @@ When a request matches several models (e.g. a user who is both `User` and `Admin
 
 ### How it works
 
-UserPattern **never stores a user identifier** (no id, email, or any PII). It derives an opaque session fingerprint:
+UserPatterns **never stores a user identifier** (no id, email, or any PII). It derives an opaque session fingerprint:
 
 ```
 anonymous_session_id = HMAC-SHA256(
@@ -208,7 +207,7 @@ config.session_detection = ->(request) { request.headers["X-Request-ID"] }
 
 ## Performance
 
-UserPattern is designed to add negligible overhead to response times.
+UserPatterns is designed to add negligible overhead to response times.
 
 ### Buffer architecture (collection)
 
@@ -250,7 +249,7 @@ Three indexes cover the dashboard queries:
 To prevent the table from growing indefinitely:
 
 ```bash
-rails userpattern:cleanup
+rails user_patterns:cleanup
 ```
 
 Schedule as a daily cron job. Deletes events older than `retention_period` (30 days by default).
@@ -261,7 +260,7 @@ The dashboard is served at the engine mount path:
 
 ```ruby
 # config/routes.rb
-mount UserPattern::Engine, at: "/userpatterns"
+mount UserPatterns::Engine, at: "/user_patterns"
 ```
 
 ### Usage tab
@@ -306,8 +305,8 @@ The dashboard is **secure by default**. If no custom authentication is configure
 Set these two variables and the dashboard is protected:
 
 ```bash
-export USERPATTERN_DASHBOARD_USER=admin
-export USERPATTERN_DASHBOARD_PASSWORD=your-secret-password
+export USER_PATTERNS_DASHBOARD_USER=admin
+export USER_PATTERNS_DASHBOARD_PASSWORD=your-secret-password
 ```
 
 If neither variable is set and no custom auth is configured, the dashboard returns **403 Forbidden** with setup instructions.
@@ -320,9 +319,9 @@ Override the default with a Proc that runs in the controller context:
 
 ```ruby
 config.dashboard_auth = -> {
-  authenticate_or_request_with_http_basic("UserPattern") do |user, pass|
+  authenticate_or_request_with_http_basic("UserPatterns") do |user, pass|
     ActiveSupport::SecurityUtils.secure_compare(user, "admin") &
-      ActiveSupport::SecurityUtils.secure_compare(pass, ENV["USERPATTERN_PASSWORD"])
+      ActiveSupport::SecurityUtils.secure_compare(pass, ENV["USER_PATTERNS_PASSWORD"])
   end
 }
 ```
@@ -340,7 +339,7 @@ config.dashboard_auth = -> {
 ```ruby
 # config/routes.rb
 authenticate :user, ->(u) { u.admin? } do
-  mount UserPattern::Engine, at: "/userpatterns"
+  mount UserPatterns::Engine, at: "/user_patterns"
 end
 ```
 
@@ -354,11 +353,11 @@ config.dashboard_auth = -> {
 
 ## Alert mode
 
-Alert mode turns UserPattern from a passive observer into an active rate limiter. Thresholds are **not configured manually** — they are derived from the max frequencies observed during collection.
+Alert mode turns UserPatterns from a passive observer into an active rate limiter. Thresholds are **not configured manually** — they are derived from the max frequencies observed during collection.
 
 ### How it works
 
-1. **Collection phase** — run in `:collection` mode for days or weeks. UserPattern observes that `GET /api/users` has a max of 5/min, 30/hour, 100/day.
+1. **Collection phase** — run in `:collection` mode for days or weeks. UserPatterns observes that `GET /api/users` has a max of 5/min, 30/hour, 100/day.
 2. **Switch to alert** — set `config.mode = :alert`. Those observed maximums (× `threshold_multiplier`) become the rate limits.
 3. **Enforcement** — a `before_action` checks every request against the limits. If a user exceeds them, the configured response actions are triggered.
 
@@ -380,7 +379,7 @@ after_action (always active — collection continues in alert mode)
 ### Enabling alert mode
 
 ```ruby
-UserPattern.configure do |config|
+UserPatterns.configure do |config|
   config.mode = :alert
   config.threshold_multiplier = 1.5       # limit = observed_max * 1.5
   config.threshold_refresh_interval = 300 # reload limits every 5 minutes
@@ -408,7 +407,7 @@ Configure which actions to take when a threshold is exceeded:
 |---|---|
 | `:raise` | Raise `ThresholdExceeded`. Handle via `rescue_from` in your controller. |
 | `:log` | Log the violation to `Rails.logger` at warn level. |
-| `:record` | Persist to `userpattern_violations` table. Visible in the dashboard. |
+| `:record` | Persist to `user_patterns_violations` table. Visible in the dashboard. |
 | `:logout` | Call `config.logout_method` to terminate the session. |
 
 Actions can be combined:
@@ -421,11 +420,11 @@ Without `:raise`, the request **continues normally** (useful for shadow/monitori
 
 ### ThresholdExceeded exception
 
-When `:raise` is in `violation_actions`, a `UserPattern::ThresholdExceeded` error is raised. Handle it in your application controller:
+When `:raise` is in `violation_actions`, a `UserPatterns::ThresholdExceeded` error is raised. Handle it in your application controller:
 
 ```ruby
 class ApplicationController < ActionController::Base
-  rescue_from UserPattern::ThresholdExceeded do |e|
+  rescue_from UserPatterns::ThresholdExceeded do |e|
     render json: {
       error: "Too many requests",
       endpoint: e.endpoint,
@@ -468,8 +467,8 @@ Alert mode introduces two new locations where user-related data appears. Neither
 
 | Location | What is stored | Lifetime | Contains raw user ID? |
 |---|---|---|---|
-| `userpattern_request_events` (DB) | `anonymous_session_id` — HMAC hash of session/JWT | Retained until cleanup | No |
-| `userpattern_violations` (DB) | `user_identifier` — HMAC hash of `"ModelType:user.id"` | Permanent | No |
+| `user_patterns_request_events` (DB) | `anonymous_session_id` — HMAC hash of session/JWT | Retained until cleanup | No |
+| `user_patterns_violations` (DB) | `user_identifier` — HMAC hash of `"ModelType:user.id"` | Permanent | No |
 | Cache store (Redis / memory) | Counter keys containing `user.id` | Expires automatically (2 min – 2 days) | Yes, but ephemeral |
 | `ThresholdExceeded` exception | `user_id` attribute in the exception object | Request lifetime | Yes, in-memory only |
 | `Rails.logger` | `user.id` in the log message (if `:log` action is enabled) | Depends on log retention | Yes |
@@ -480,36 +479,36 @@ Alert mode introduces two new locations where user-related data appears. Neither
 ## Gem structure
 
 ```
-userpattern/
+user_patterns/
 ├── app/
-│   ├── controllers/user_pattern/dashboard_controller.rb
-│   ├── models/user_pattern/
+│   ├── controllers/user_patterns/dashboard_controller.rb
+│   ├── models/user_patterns/
 │   │   ├── request_event.rb
 │   │   └── violation.rb
-│   └── views/user_pattern/dashboard/
+│   └── views/user_patterns/dashboard/
 │       ├── index.html.erb
 │       └── violations.html.erb
 ├── config/routes.rb
 ├── lib/
-│   ├── userpattern.rb
-│   ├── userpattern/
-│   │   ├── anonymizer.rb           # HMAC anonymization
-│   │   ├── buffer.rb               # Thread-safe in-memory buffer
-│   │   ├── configuration.rb        # Configuration DSL
-│   │   ├── controller_tracking.rb  # before_action + after_action concern
-│   │   ├── engine.rb               # Rails Engine
-│   │   ├── path_normalizer.rb      # URL normalization
-│   │   ├── rate_limiter.rb         # Cache-backed rate limiting
-│   │   ├── stats_calculator.rb     # SQL-agnostic stats computation
-│   │   ├── threshold_cache.rb      # Periodic limit loader
-│   │   ├── threshold_exceeded.rb   # Custom exception
-│   │   ├── violation_recorder.rb   # Anonymized violation persistence
+│   ├── user_patterns.rb              # Entry point, autoloads, top-level config
+│   ├── user_patterns/
+│   │   ├── anonymizer.rb             # HMAC anonymization
+│   │   ├── buffer.rb                 # Thread-safe in-memory buffer
+│   │   ├── configuration.rb          # Configuration DSL
+│   │   ├── controller_tracking.rb    # before_action + after_action concern
+│   │   ├── engine.rb                 # Rails Engine
+│   │   ├── path_normalizer.rb        # URL normalization
+│   │   ├── rate_limiter.rb           # Cache-backed rate limiting
+│   │   ├── stats_calculator.rb       # SQL-agnostic stats computation
+│   │   ├── threshold_cache.rb        # Periodic limit loader
+│   │   ├── threshold_exceeded.rb     # Custom exception
+│   │   ├── violation_recorder.rb     # Anonymized violation persistence
 │   │   └── version.rb
-│   ├── generators/userpattern/
+│   ├── generators/user_patterns/
 │   │   ├── install_generator.rb
 │   │   └── templates/
-│   └── tasks/userpattern.rake
-├── userpattern.gemspec
+│   └── tasks/user_patterns.rake
+├── user_patterns.gemspec
 └── README.md
 ```
 

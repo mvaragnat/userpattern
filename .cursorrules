@@ -132,7 +132,7 @@ spec/
 
 ## When Writing Code for This Project
 
-Apply all the above principles. Specifically for `userpattern`:
+Apply all the above principles. Specifically for `user_patterns`:
 
 1. This is a Ruby gem for post-login security.
    - Clean client interface (zero-config for simple cases, configurable for complex)
