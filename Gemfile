@@ -5,7 +5,7 @@ source 'https://rubygems.org'
 gemspec
 
 group :development, :test do
-  gem 'parallel', '< 2.0' # parallel 2.0+ requires Ruby >= 3.3
+  gem 'parallel'
   gem 'rake'
   gem 'rspec-rails'
   gem 'rubocop', require: false
