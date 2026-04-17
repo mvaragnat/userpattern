@@ -3,16 +3,16 @@
 require_relative 'lib/userpattern/version'
 
 Gem::Specification.new do |spec|
-  spec.name = 'userpattern'
+  spec.name = 'user_patterns'
   spec.version = UserPattern::VERSION
-  spec.authors = ['UserPattern Contributors']
+  spec.authors = ['UserPatterns Contributors']
   spec.email = []
 
   spec.summary = 'Anonymized usage pattern analysis for Rails applications'
   spec.description = 'Track and analyze endpoint usage patterns of logged-in users ' \
-                     'with full anonymization. Provides a sortable dashboard with ' \
-                     'per-model-type frequency statistics.'
-  spec.homepage = 'https://github.com/mvaragnat/userpattern'
+                     'with full anonymization. Block suspicious behaviors that deviate ' \
+                     'from normal patterns. Complementary with RackAttack.'
+  spec.homepage = 'https://github.com/mvaragnat/user_patterns'
   spec.license = 'MIT'
   spec.required_ruby_version = '>= 3.2'
 
