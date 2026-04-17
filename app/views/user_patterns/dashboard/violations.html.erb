@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>UserPatterns — Violations</title>
+  <link rel="stylesheet" href="<%= user_patterns.stylesheet_path %>">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>UserPatterns</h1>
+      <span class="version">v<%= UserPatterns::VERSION %></span>
+      <% if UserPatterns.configuration.alert_mode? %>
+        <span class="mode-badge alert">Alert Mode</span>
+      <% else %>
+        <span class="mode-badge collection">Collection Mode</span>
+      <% end %>
+    </header>
+
+    <nav class="page-tabs">
+      <a href="<%= user_patterns.root_path %>">Usage</a>
+      <a href="<%= user_patterns.violations_path %>" class="active">Violations</a>
+    </nav>
+
+    <div class="filter-bar">
+      <% [7, 14, 30].each do |days| %>
+        <a href="<%= user_patterns.violations_path(days: days) %>"
+           class="<%= 'active' if (params[:days]&.to_i || 7) == days %>">
+          Last <%= days %> days
+        </a>
+      <% end %>
+    </div>
+
+    <div class="card">
+      <% if @violations.any? %>
+        <table id="violations-table">
+          <thead>
+            <tr>
+              <th>Endpoint</th>
+              <th>Model</th>
+              <th>Period</th>
+              <th class="num">Count</th>
+              <th class="num">Limit</th>
+              <th>User (hashed)</th>
+              <th>Occurred At</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @violations.each do |v| %>
+              <tr class="violation-row">
+                <td class="endpoint"><%= v.endpoint %></td>
+                <td><%= v.model_type %></td>
+                <td><%= v.period %></td>
+                <td class="num violation-exceeded"><%= v.count %></td>
+                <td class="num"><%= v.limit %></td>
+                <td class="mono"><%= v.user_identifier[0, 8] %>&hellip;</td>
+                <td><%= v.occurred_at.strftime("%Y-%m-%d %H:%M:%S") %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      <% else %>
+        <div class="empty-state">
+          <p>No violations recorded in the selected period.</p>
+          <% unless UserPatterns.configuration.alert_mode? %>
+            <p>Switch to <strong>alert mode</strong> and enable <code>:record</code> in <code>violation_actions</code> to capture violations.</p>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+
+    <p class="footer">
+      <% total_violations = UserPatterns::Violation.count %>
+      <%= total_violations %> total violation<%= total_violations == 1 ? "" : "s" %> on record
+    </p>
+  </div>
+</body>
+</html>

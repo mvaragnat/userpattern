@@ -1,10 +1,10 @@
 # frozen_string_literal: true
 
-require_relative 'lib/userpattern/version'
+require_relative 'lib/user_patterns/version'
 
 Gem::Specification.new do |spec|
   spec.name = 'user_patterns'
-  spec.version = UserPattern::VERSION
+  spec.version = UserPatterns::VERSION
   spec.authors = ['UserPatterns Contributors']
   spec.email = []
 

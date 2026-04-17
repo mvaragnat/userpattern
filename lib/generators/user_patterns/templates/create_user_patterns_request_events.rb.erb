@@ -1,0 +1,23 @@
+class CreateUserPatternsRequestEvents < ActiveRecord::Migration[<%= ActiveRecord::Migration.current_version %>]
+  def change
+    create_table :user_patterns_request_events do |t|
+      t.string   :model_type,           null: false
+      t.string   :endpoint,             null: false
+      t.string   :anonymous_session_id, null: false
+      t.datetime :recorded_at,          null: false
+      t.datetime :created_at,           null: false
+    end
+
+    add_index :user_patterns_request_events,
+              [:model_type, :endpoint, :recorded_at],
+              name: "idx_up_model_endpoint_time"
+
+    add_index :user_patterns_request_events,
+              [:model_type, :endpoint, :anonymous_session_id],
+              name: "idx_up_model_endpoint_session"
+
+    add_index :user_patterns_request_events,
+              :recorded_at,
+              name: "idx_up_recorded_at"
+  end
+end
