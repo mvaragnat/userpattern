@@ -49,7 +49,7 @@
           <tbody>
             <% @violations.each do |v| %>
               <tr class="violation-row">
-                <td class="endpoint"><%= v.endpoint %></td>
+                <td class="endpoint" title="<%= v.endpoint %>"><%= v.endpoint %></td>
                 <td><%= v.model_type %></td>
                 <td><%= v.period %></td>
                 <td class="num violation-exceeded"><%= v.count %></td>
