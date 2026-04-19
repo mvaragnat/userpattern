@@ -136,7 +136,7 @@ th.sorted-asc .arrow::after { content: "\25B2"; color: #2563eb; }
 th.sorted-desc .arrow::after { content: "\25BC"; color: #2563eb; }
 th:not(.sorted-asc):not(.sorted-desc) .arrow::after { content: "\25B4\25BE"; }
 
-td.endpoint { font-family: "SF Mono", Monaco, "Cascadia Code", monospace; font-size: 0.85rem; }
+td.endpoint { font-family: "SF Mono", Monaco, "Cascadia Code", monospace; font-size: 0.85rem; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 td.mono { font-family: "SF Mono", Monaco, "Cascadia Code", monospace; font-size: 0.85rem; color: #64748b; }
 
 td.num { text-align: right; font-variant-numeric: tabular-nums; }

@@ -80,7 +80,7 @@
             <% @filtered_stats.each do |stat| %>
               <% limits = @threshold_limits[[@selected_model, stat[:endpoint]]] || {} %>
               <tr>
-                <td class="endpoint"><%= stat[:endpoint] %></td>
+                <td class="endpoint" title="<%= stat[:endpoint] %>"><%= stat[:endpoint] %></td>
                 <td class="num"><%= stat[:total_requests] %></td>
                 <td class="num"><%= stat[:total_sessions] %></td>
                 <td class="num"><%= stat[:avg_per_session] %></td>
