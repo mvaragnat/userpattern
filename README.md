@@ -26,7 +26,7 @@ Rack::Attack and UserPatterns are **complementary**. Rack::Attack protects again
 | **Awareness** | Rack-level, no access to `current_user` | Controller-level, resolves authenticated identity |
 | **Analytics** | None (logging via ActiveSupport::Notifications) | Dashboard with per-endpoint, per-model-type stats |
 | **Baseline** | Developer defines "normal" | System observes "normal" during collection |
-| **URL handling** | Raw URLs | Auto-normalized (IDs, UUIDs, query params) |
+| **URL handling** | Raw URLs | Auto-normalized (IDs, UUIDs, query strings stripped) |
 | **Privacy** | N/A | Anonymized collection, no PII in DB |
 
 **When to use Rack::Attack:** IP-level rate limiting, blocking known bad actors, unauthenticated abuse prevention, DDoS protection.
@@ -169,7 +169,7 @@ anonymous_session_id = HMAC-SHA256(
 | **Truncation** | Only 16 hex chars kept (64 bits), further reducing entropy |
 | **No user↔action link** | No user ID in the database. Even with full DB access you can only see aggregate stats |
 
-### URL and query string normalization
+### URL normalization
 
 Endpoints are normalized **at collection time** so that URLs differing only by dynamic segments are aggregated into a single pattern. No raw URL ever reaches the database.
 
@@ -182,12 +182,13 @@ Endpoints are normalized **at collection time** so that URLs differing only by d
 /verify/a1b2c3d4e5f6a7b8c9d0      → /verify/:id
 ```
 
-**Query parameters** — values that look like IDs, UUIDs, or tokens are redacted with `:xxx`. Non-dynamic values (e.g. `status=active`) are preserved. Parameters are sorted so that different orderings map to the same endpoint:
+**Query strings** — stripped entirely. This serves two purposes: **anonymization** (query parameters can carry sensitive data such as search terms, filter values, or tokens) and **grouping** (requests to the same path with different parameters are collapsed into a single endpoint bucket for meaningful statistics):
 
 ```
-/admin?application_id=84ef5373-...        → /admin?application_id=:xxx
-/search?status=active                     → /search?status=active
-/api?user_id=42&status=open&token=abc...  → /api?status=open&token=:xxx&user_id=:xxx
+/demands/users?order=name_asc   → /demands/users
+/demands/users?order=name_desc  → /demands/users   (same bucket)
+/search?q=sensitive+term        → /search
+/admin?user_id=42&token=abc...  → /admin
 ```
 
 ### Session detection modes
