@@ -122,5 +122,62 @@ RSpec.describe UserPatterns::Configuration do
         { name: 'Admin', current_method: :current_admin_user }
       )
     end
+
+    it 'preserves except_paths when provided' do
+      config.tracked_models = [{ name: 'User', except_paths: [%r{\A/admin}] }]
+      expect(config.tracked_models.first[:except_paths]).to eq([%r{\A/admin}])
+    end
+
+    it 'preserves only_paths when provided' do
+      config.tracked_models = [{ name: 'Admin', only_paths: [%r{\A/admin}] }]
+      expect(config.tracked_models.first[:only_paths]).to eq([%r{\A/admin}])
+    end
+
+    it 'wraps a single path pattern in an array' do
+      config.tracked_models = [{ name: 'User', except_paths: '/health' }]
+      expect(config.tracked_models.first[:except_paths]).to eq(['/health'])
+    end
+
+    it 'omits path keys when not provided' do
+      config.tracked_models = [{ name: 'User' }]
+      expect(config.tracked_models.first).not_to have_key(:only_paths)
+      expect(config.tracked_models.first).not_to have_key(:except_paths)
+    end
+  end
+
+  describe '#model_tracks_path?' do
+    it 'allows any path when no path filters are set' do
+      model = { name: 'User', current_method: :current_user }
+      expect(config.model_tracks_path?(model, '/admin/dashboard')).to be true
+    end
+
+    it 'rejects paths matching except_paths string' do
+      model = { name: 'User', current_method: :current_user, except_paths: ['/admin'] }
+      expect(config.model_tracks_path?(model, '/admin')).to be false
+      expect(config.model_tracks_path?(model, '/users')).to be true
+    end
+
+    it 'rejects paths matching except_paths regexp' do
+      model = { name: 'User', current_method: :current_user, except_paths: [%r{\A/admin}] }
+      expect(config.model_tracks_path?(model, '/admin/team')).to be false
+      expect(config.model_tracks_path?(model, '/users')).to be true
+    end
+
+    it 'allows only paths matching only_paths' do
+      model = { name: 'Admin', current_method: :current_admin, only_paths: [%r{\A/admin}] }
+      expect(config.model_tracks_path?(model, '/admin/team')).to be true
+      expect(config.model_tracks_path?(model, '/users')).to be false
+    end
+
+    it 'applies both only_paths and except_paths together' do
+      model = {
+        name: 'Admin', current_method: :current_admin,
+        only_paths: [%r{\A/admin}],
+        except_paths: [%r{/admin/internal}]
+      }
+      expect(config.model_tracks_path?(model, '/admin/team')).to be true
+      expect(config.model_tracks_path?(model, '/admin/internal/debug')).to be false
+      expect(config.model_tracks_path?(model, '/users')).to be false
+    end
   end
 end

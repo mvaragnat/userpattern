@@ -7,6 +7,13 @@ UserPatterns.configure do |config|
   config.tracked_models = [
     { name: 'User', current_method: :current_user }
     # { name: "Admin", current_method: :current_admin },
+    #
+    # Per-model path filtering (avoid cross-contamination between model tabs):
+    #   :except_paths — skip these paths for this model (String or Regexp)
+    #   :only_paths   — only track these paths for this model
+    #
+    # { name: "User", except_paths: [%r{\A/admin}] },
+    # { name: "AdminUser", only_paths: [%r{\A/admin}] },
   ]
 
   # ─── Session detection ─────────────────────────────────────────────

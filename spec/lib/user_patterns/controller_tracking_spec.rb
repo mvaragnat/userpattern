@@ -227,4 +227,86 @@ RSpec.describe 'Controller tracking', type: :request do
       expect(UserPatterns.buffer.size).to eq(1)
     end
   end
+
+  describe 'per-model path filtering' do
+    let(:admin_user) { FakeUser.new(2) }
+
+    before do
+      TestController.fake_current_user = user
+      TestController.fake_current_admin_user = admin_user
+    end
+
+    context 'with except_paths on User model' do
+      before do
+        UserPatterns.configuration.tracked_models = [
+          { name: 'User', current_method: :current_user, except_paths: [%r{\A/admin}] },
+          { name: 'AdminUser', current_method: :current_admin_user }
+        ]
+      end
+
+      it 'does not record a User event for admin paths' do
+        get '/admin_team/care_demands'
+        UserPatterns.buffer.flush
+
+        events = UserPatterns::RequestEvent.all
+        expect(events.map(&:model_type)).to eq(['AdminUser'])
+      end
+
+      it 'still records User events for non-admin paths' do
+        get '/test_page'
+        UserPatterns.buffer.flush
+
+        model_types = UserPatterns::RequestEvent.pluck(:model_type)
+        expect(model_types).to include('User')
+        expect(model_types).to include('AdminUser')
+      end
+    end
+
+    context 'with only_paths on AdminUser model' do
+      before do
+        UserPatterns.configuration.tracked_models = [
+          { name: 'User', current_method: :current_user },
+          { name: 'AdminUser', current_method: :current_admin_user, only_paths: [%r{\A/admin}] }
+        ]
+      end
+
+      it 'records AdminUser events only for matching paths' do
+        get '/admin_team/care_demands'
+        UserPatterns.buffer.flush
+
+        model_types = UserPatterns::RequestEvent.pluck(:model_type)
+        expect(model_types).to include('AdminUser')
+        expect(model_types).to include('User')
+      end
+
+      it 'does not record AdminUser events for non-matching paths' do
+        get '/test_page'
+        UserPatterns.buffer.flush
+
+        model_types = UserPatterns::RequestEvent.pluck(:model_type)
+        expect(model_types).to eq(['User'])
+      end
+    end
+
+    context 'with both only_paths and except_paths' do
+      before do
+        UserPatterns.configuration.tracked_models = [
+          { name: 'User', current_method: :current_user, except_paths: [%r{\A/admin}] },
+          { name: 'AdminUser', current_method: :current_admin_user, only_paths: [%r{\A/admin}] }
+        ]
+      end
+
+      it 'cleanly separates admin and user endpoints' do
+        get '/admin_team/care_demands'
+        get '/test_page'
+        UserPatterns.buffer.flush
+
+        admin_events = UserPatterns::RequestEvent.where(model_type: 'AdminUser')
+        user_events  = UserPatterns::RequestEvent.where(model_type: 'User')
+
+        expect(admin_events.pluck(:endpoint)).to eq(['GET /admin_team/care_demands'])
+        expect(user_events.pluck(:endpoint)).to eq(['GET /test_page'])
+      end
+    end
+  end
 end

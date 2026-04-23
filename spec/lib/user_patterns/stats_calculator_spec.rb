@@ -41,7 +41,7 @@ RSpec.describe UserPatterns::StatsCalculator do
       expect(described_class.compute_all.length).to eq(3)
     end
 
-    it 'computes max_per_minute' do
+    it 'computes max_per_minute for a single session' do
       base = Time.utc(2026, 1, 1, 12, 0, 0)
       3.times { |i| create_event(recorded_at: base + i.seconds) }
       create_event(recorded_at: base + 2.minutes)
@@ -50,7 +50,16 @@ RSpec.describe UserPatterns::StatsCalculator do
       expect(stat[:max_per_minute]).to eq(3)
     end
 
-    it 'computes max_per_hour' do
+    it 'computes max_per_minute per session, not across all sessions' do
+      base = Time.utc(2026, 1, 1, 12, 0, 0)
+      3.times { |i| create_event(recorded_at: base + i.seconds, anonymous_session_id: 'agent_mulder') }
+      create_event(recorded_at: base + 30.seconds, anonymous_session_id: 'agent_scully')
+
+      stat = described_class.compute_all.first
+      expect(stat[:max_per_minute]).to eq(3)
+    end
+
+    it 'computes max_per_hour per session' do
       base = Time.utc(2026, 1, 1, 12, 0, 0)
       5.times { |i| create_event(recorded_at: base + (i * 10).minutes) }
       2.times { |i| create_event(recorded_at: base + 1.hour + (i * 10).minutes) }
@@ -59,7 +68,7 @@ RSpec.describe UserPatterns::StatsCalculator do
       expect(stat[:max_per_hour]).to eq(5)
     end
 
-    it 'computes max_per_day' do
+    it 'computes max_per_day per session' do
       base = Time.utc(2026, 1, 1, 12, 0, 0)
       3.times { create_event(recorded_at: base) }
       2.times { create_event(recorded_at: base + 1.day) }
@@ -97,14 +106,14 @@ RSpec.describe UserPatterns::StatsCalculator do
       end
     end
 
-    it 'computes avg_per_minute across the observed time span' do
+    it 'computes avg_per_minute as the average per-session requests per minute' do
       base = Time.utc(2026, 1, 1, 12, 0, 0)
-      create_event(recorded_at: base)
-      create_event(recorded_at: base + 5.minutes)
+      3.times { |i| create_event(recorded_at: base + i.seconds, anonymous_session_id: 'agent_mulder') }
+      create_event(recorded_at: base + 30.seconds, anonymous_session_id: 'agent_scully')
 
       stat = described_class.compute_all.first
-      expect(stat[:avg_per_minute]).to be_a(Float)
-      expect(stat[:avg_per_minute]).to be > 0
+      # (mulder: 3 in min 0) + (scully: 1 in min 0) => avg = (3 + 1) / 2 = 2.0
+      expect(stat[:avg_per_minute]).to eq(2.0)
     end
   end
 
@@ -134,11 +143,6 @@ RSpec.describe UserPatterns::StatsCalculator do
 
   describe 'edge cases' do
     let(:calculator) { described_class.new }
-
-    it 'returns 1.0 for time span when timestamps are nil' do
-      expect(calculator.send(:time_span_seconds, nil, Time.current)).to eq(1.0)
-      expect(calculator.send(:time_span_seconds, Time.current, nil)).to eq(1.0)
-    end
 
     it 'returns 0.0 from safe_divide when denominator is zero' do
       expect(calculator.send(:safe_divide, 10, 0)).to eq(0.0)

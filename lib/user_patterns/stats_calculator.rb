@@ -34,7 +34,6 @@ module UserPatterns
 
     def build_stat(row)
       model_type, endpoint, total, sessions, first_seen, last_seen = row
-      span = time_span_seconds(first_seen, last_seen)
 
       {
         model_type: model_type,
@@ -42,22 +41,37 @@ module UserPatterns
         total_requests: total,
         total_sessions: sessions,
         avg_per_session: safe_divide(total, sessions),
-        avg_per_minute: avg_rate(total, span, 60),
-        max_per_minute: max_per_bucket(model_type, endpoint, :minute),
-        max_per_hour: max_per_bucket(model_type, endpoint, :hour),
-        max_per_day: max_per_bucket(model_type, endpoint, :day),
         first_seen_at: first_seen,
         last_seen_at: last_seen
+      }.merge(session_rates(model_type, endpoint))
+    end
+
+    def session_rates(model_type, endpoint)
+      minute_stats = per_session_bucket_stats(model_type, endpoint, :minute)
+      hour_stats   = per_session_bucket_stats(model_type, endpoint, :hour)
+      day_stats    = per_session_bucket_stats(model_type, endpoint, :day)
+
+      {
+        avg_per_minute: minute_stats[:avg],
+        max_per_minute: minute_stats[:max],
+        max_per_hour: hour_stats[:max],
+        max_per_day: day_stats[:max]
       }
     end
 
-    def max_per_bucket(model_type, endpoint, period)
-      RequestEvent
-        .where(model_type: model_type, endpoint: endpoint)
-        .group(Arel.sql(bucket_expression(period)))
-        .count
-        .values
-        .max || 0
+    # Groups by (time_bucket, session) so each count represents a single
+    # session's activity in one period — the baseline for per-user limits.
+    def per_session_bucket_stats(model_type, endpoint, period)
+      counts = RequestEvent
+               .where(model_type: model_type, endpoint: endpoint)
+               .group(Arel.sql(bucket_expression(period)), :anonymous_session_id)
+               .count
+               .values
+
+      {
+        max: counts.max || 0,
+        avg: counts.empty? ? 0.0 : (counts.sum.to_f / counts.size).round(2)
+      }
     end
 
     def bucket_expression(period)
@@ -78,24 +92,10 @@ module UserPatterns
       ActiveRecord::Base.connection.adapter_name.downcase
     end
 
-    def time_span_seconds(first, last)
-      return 1.0 if first.nil? || last.nil?
-
-      span = (last.to_time - first.to_time).to_f
-      span.positive? ? span : 1.0
-    end
-
     def safe_divide(numerator, denominator)
       return 0.0 if denominator.nil? || denominator.zero?
 
       (numerator.to_f / denominator).round(2)
-    end
-
-    def avg_rate(total, span_seconds, period_seconds)
-      periods = span_seconds / period_seconds.to_f
-      return total.to_f.round(2) if periods < 1
-
-      (total / periods).round(2)
     end
   end
 end

@@ -14,7 +14,7 @@ RSpec.describe UserPatterns::ThresholdCache do
       UserPatterns::RequestEvent.create!(
         model_type: model_type,
         endpoint: endpoint,
-        anonymous_session_id: "s#{i}",
+        anonymous_session_id: 'agent_mulder',
         recorded_at: base + i.seconds,
         created_at: base
       )
