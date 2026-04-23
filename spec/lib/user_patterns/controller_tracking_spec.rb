@@ -59,6 +59,20 @@ RSpec.describe 'Controller tracking', type: :request do
       end
     end
 
+    describe 'when tracking is re-enabled after being disabled' do
+      before { TestController.fake_current_user = user }
+
+      it 'resumes buffering events' do
+        UserPatterns.configuration.enabled = false
+        get '/test_page'
+        expect(UserPatterns.buffer.size).to eq(0)
+
+        UserPatterns.configuration.enabled = true
+        get '/test_page'
+        expect(UserPatterns.buffer.size).to eq(1)
+      end
+    end
+
     describe 'ignored paths' do
       before { TestController.fake_current_user = user }
 
@@ -174,6 +188,16 @@ RSpec.describe 'Controller tracking', type: :request do
         3.times { get '/test_page' }
 
         expect(response).to have_http_status(:ok)
+      end
+    end
+
+    context 'when tracking is globally disabled' do
+      before { UserPatterns.configuration.enabled = false }
+
+      it 'skips rate limiting entirely' do
+        10.times { get '/test_page' }
+        expect(response).to have_http_status(:ok)
+        expect(UserPatterns.buffer.size).to eq(0)
       end
     end
 
