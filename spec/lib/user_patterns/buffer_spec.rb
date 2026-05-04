@@ -8,8 +8,8 @@ RSpec.describe UserPatterns::Buffer do
   let(:event) do
     {
       model_type: 'User',
-      endpoint: 'GET /test',
-      anonymous_session_id: 'abc123def456',
+      endpoint: 'GET /basement/archives',
+      anonymous_session_id: 'agent_mulder_42',
       recorded_at: Time.current
     }
   end
@@ -29,11 +29,11 @@ RSpec.describe UserPatterns::Buffer do
   end
 
   describe '#flush' do
-    it 'writes buffered events to the database' do
+    it 'enqueues a FlushEventsJob with buffered events' do
       buffer.push(event)
-      buffer.flush
 
-      expect(UserPatterns::RequestEvent.count).to eq(1)
+      expect { buffer.flush }
+        .to have_enqueued_job(UserPatterns::FlushEventsJob).with([event])
     end
 
     it 'clears the queue' do
@@ -43,36 +43,22 @@ RSpec.describe UserPatterns::Buffer do
       expect(buffer.size).to eq(0)
     end
 
-    it 'persists correct attributes' do
-      buffer.push(event)
-      buffer.flush
-
-      record = UserPatterns::RequestEvent.last
-      expect(record.model_type).to eq('User')
-      expect(record.endpoint).to eq('GET /test')
-      expect(record.anonymous_session_id).to eq('abc123def456')
-    end
-
-    it 'handles a batch of events' do
-      5.times { |i| buffer.push(event.merge(endpoint: "GET /page_#{i}")) }
-      buffer.flush
-
-      expect(UserPatterns::RequestEvent.count).to eq(5)
-    end
-
     it 'is a no-op when the queue is empty' do
-      expect { buffer.flush }.not_to change(UserPatterns::RequestEvent, :count)
+      expect { buffer.flush }
+        .not_to have_enqueued_job(UserPatterns::FlushEventsJob)
     end
   end
 
   describe '#push with buffer size exceeded' do
-    it 'triggers async flush when buffer size is reached' do
-      UserPatterns.configuration.buffer_size = 1
+    it 'triggers flush when buffer size is reached' do
+      UserPatterns.configuration.buffer_size = 2
       buf = described_class.new
-      buf.push(event)
-      buf.shutdown
 
-      expect(UserPatterns::RequestEvent.count).to eq(1)
+      buf.push(event)
+      expect { buf.push(event) }
+        .to have_enqueued_job(UserPatterns::FlushEventsJob)
+
+      buf.shutdown
     end
   end
 
@@ -84,21 +70,50 @@ RSpec.describe UserPatterns::Buffer do
       flushing.make_true
       buffer.flush
 
-      expect(UserPatterns::RequestEvent.count).to eq(0)
+      expect(buffer.size).to eq(1)
 
       flushing.make_false
       buffer.flush
-      expect(UserPatterns::RequestEvent.count).to eq(1)
+      expect(buffer.size).to eq(0)
     end
   end
 
-  describe '#flush with persistence error' do
+  describe '#flush enqueue failure' do
+    it 'falls back to synchronous persistence when enqueue fails' do
+      allow(UserPatterns::FlushEventsJob).to receive(:perform_later)
+        .and_raise(StandardError, 'Redis down')
+
+      buffer.push(event)
+      buffer.flush
+
+      expect(UserPatterns::RequestEvent.count).to eq(1)
+    end
+
+    it 'logs the enqueue error' do
+      allow(UserPatterns::FlushEventsJob).to receive(:perform_later)
+        .and_raise(StandardError, 'Redis down')
+      allow(Rails.logger).to receive(:error)
+
+      buffer.push(event)
+      buffer.flush
+
+      expect(Rails.logger).to have_received(:error).with(/Enqueue error.*Redis down/)
+    end
+  end
+
+  describe '#flush with sync persistence error' do
     it 'logs the error and does not raise' do
-      allow(UserPatterns::RequestEvent).to receive(:insert_all).and_raise(StandardError, 'db error')
+      allow(UserPatterns::FlushEventsJob).to receive(:perform_later)
+        .and_raise(StandardError, 'enqueue failed')
+      allow(UserPatterns::RequestEvent).to receive(:insert_all)
+        .and_raise(StandardError, 'db error')
+      allow(Rails.logger).to receive(:error)
+
       buffer.push(event)
 
-      expect(Rails.logger).to receive(:error).with(/Flush error/)
       expect { buffer.flush }.not_to raise_error
+      expect(Rails.logger).to have_received(:error).with(/Enqueue error/).ordered
+      expect(Rails.logger).to have_received(:error).with(/Flush error/).ordered
     end
   end
 
@@ -116,7 +131,7 @@ RSpec.describe UserPatterns::Buffer do
       buf.push(event)
       timer_block.call
 
-      expect(UserPatterns::RequestEvent.count).to eq(1)
+      expect(buf.size).to eq(0)
       buf.shutdown
     end
 
@@ -127,20 +142,22 @@ RSpec.describe UserPatterns::Buffer do
     end
   end
 
-  describe 'persist_events with empty drain' do
-    it 'is a no-op when drain_queue returns empty' do
-      buf = described_class.new
-      expect(UserPatterns::RequestEvent).not_to receive(:insert_all)
-      buf.send(:persist_events)
-    end
-  end
-
   describe '#shutdown' do
-    it 'flushes remaining events before stopping' do
+    it 'writes remaining events synchronously' do
       buffer.push(event)
       buffer.shutdown
 
       expect(UserPatterns::RequestEvent.count).to eq(1)
+    end
+
+    it 'persists correct attributes on shutdown' do
+      buffer.push(event)
+      buffer.shutdown
+
+      record = UserPatterns::RequestEvent.last
+      expect(record.model_type).to eq('User')
+      expect(record.endpoint).to eq('GET /basement/archives')
+      expect(record.anonymous_session_id).to eq('agent_mulder_42')
     end
   end
 end

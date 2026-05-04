@@ -4,60 +4,70 @@ require 'concurrent'
 
 module UserPatterns
   # Thread-safe in-memory buffer that batches request events before flushing
-  # to the database. Minimizes per-request overhead to a single array push.
+  # via Active Job. Per-request overhead is a single mutex-protected array push.
+  #
+  # Normal path: events queue up → timer or size threshold triggers flush →
+  # FlushEventsJob is enqueued → job backend persists the batch.
+  #
+  # Shutdown path: remaining events are written synchronously so nothing is
+  # lost when the process exits.
   class Buffer
     MAX_DRAIN = 1_000
 
     def initialize
-      @queue = Concurrent::Array.new
+      @queue = []
+      @mutex = Mutex.new
       @flushing = Concurrent::AtomicBoolean.new(false)
       start_timer
     end
 
+    # @param event [Hash] a request event hash ready for persistence
     def push(event)
-      @queue << event
-      flush_async if @queue.size >= UserPatterns.configuration.buffer_size
+      size = @mutex.synchronize do
+        @queue << event
+        @queue.size
+      end
+      flush if size >= UserPatterns.configuration.buffer_size
     end
 
     def flush
-      return if @queue.empty?
       return unless @flushing.make_true
 
-      persist_events
+      events = drain_queue
+      enqueue_persist(events) unless events.empty?
     ensure
       @flushing.make_false
     end
 
     def shutdown
       @timer&.shutdown
-      flush
+      events = drain_queue
+      persist_now(events) unless events.empty?
     end
 
     def size
-      @queue.size
+      @mutex.synchronize { @queue.size }
     end
 
     private
 
-    def persist_events
-      events = drain_queue
-      return if events.empty?
+    def drain_queue
+      @mutex.synchronize { @queue.shift(MAX_DRAIN) }
+    end
 
+    def enqueue_persist(events)
+      UserPatterns::FlushEventsJob.perform_later(events)
+    rescue StandardError => e
+      Rails.logger.error("[UserPatterns] Enqueue error, falling back to sync: #{e.message}")
+      persist_now(events)
+    end
+
+    def persist_now(events)
       now = Time.current
       rows = events.map { |e| e.merge(created_at: now) }
       UserPatterns::RequestEvent.insert_all(rows)
     rescue StandardError => e
       Rails.logger.error("[UserPatterns] Flush error: #{e.message}")
-    end
-
-    def drain_queue
-      events = []
-      events << @queue.shift until @queue.empty? || events.size >= MAX_DRAIN
-      events
-    end
-
-    def flush_async
-      Thread.new { flush }
     end
 
     def start_timer
