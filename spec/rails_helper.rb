@@ -50,7 +50,7 @@ require 'user_patterns/buffer'
 require 'user_patterns/stats_calculator'
 
 class TestController < ActionController::Base
-  cattr_accessor :fake_current_user
+  cattr_accessor :fake_current_user, :fake_current_admin_user
 
   def index
     render plain: 'ok'
@@ -60,6 +60,10 @@ class TestController < ActionController::Base
 
   def current_user
     self.class.fake_current_user
+  end
+
+  def current_admin_user
+    self.class.fake_current_admin_user
   end
 end
 
@@ -74,6 +78,7 @@ RSpec.configure do |config|
     UserPatterns.configuration.anonymous_salt = 'test_salt_32chars_for_hmac_key!!'
     UserPatterns.configuration.flush_interval = 99_999
     TestController.fake_current_user = nil
+    TestController.fake_current_admin_user = nil
     UserPatterns::RequestEvent.delete_all
     UserPatterns::Violation.delete_all
   end

@@ -74,6 +74,26 @@ RSpec.describe UserPatterns::Buffer do
 
       expect(UserPatterns::RequestEvent.count).to eq(1)
     end
+
+    it 'does not flush before reaching a custom buffer_size' do
+      UserPatterns.configuration.buffer_size = 5
+      buf = described_class.new
+      4.times { buf.push(event) }
+
+      expect(buf.size).to eq(4)
+      expect(UserPatterns::RequestEvent.count).to eq(0)
+
+      buf.shutdown
+    end
+
+    it 'triggers flush once the custom buffer_size is reached' do
+      UserPatterns.configuration.buffer_size = 3
+      buf = described_class.new
+      3.times { buf.push(event) }
+      buf.shutdown
+
+      expect(UserPatterns::RequestEvent.count).to eq(3)
+    end
   end
 
   describe '#flush concurrent guard' do

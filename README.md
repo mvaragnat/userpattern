@@ -65,8 +65,8 @@ UserPatterns.configure do |config|
   # Models to track. Each entry needs :name and optionally :current_method.
   # If :current_method is omitted it defaults to :current_<underscored_name>.
   config.tracked_models = [
-    { name: "User", current_method: :current_user },
-    { name: "Admin", current_method: :current_admin },
+    { name: "User", current_method: :current_user, except_paths: [%r{\A/admin}] },
+    { name: "Admin", current_method: :current_admin, only_paths: [%r{\A/admin}] },
   ]
 
   # Session detection mode (see "Session detection" section below)
@@ -146,6 +146,19 @@ config.tracked_models = [
 ### Multiple models
 
 When a request matches several models (e.g. a user who is both `User` and `Admin` through Devise scopes), all matching models are tracked independently.
+
+### Per-model path filtering
+
+With Devise multi-scope setups, `current_user` is often non-nil on admin routes (and vice versa). This causes admin-only endpoints to appear under the `User` tab. Use `except_paths` and `only_paths` to scope each model to the paths it should track:
+
+```ruby
+config.tracked_models = [
+  { name: "User",      current_method: :current_user,       except_paths: [%r{\A/admin}] },
+  { name: "AdminUser", current_method: :current_admin_user, only_paths:   [%r{\A/admin}] },
+]
+```
+
+Both options accept an array of `String` (exact match) or `Regexp` patterns, matching against the raw request path. When both are present on the same entry, `only_paths` is checked first (whitelist), then `except_paths` (blacklist).
 
 ## Anonymization
 

@@ -38,8 +38,21 @@ module UserPatterns
       @tracked_models = list.map do |entry|
         name = entry[:name].to_s
         method = entry[:current_method] || :"current_#{name.underscore}"
-        { name: name, current_method: method }
+        model = { name: name, current_method: method }
+        model[:only_paths] = Array(entry[:only_paths]) if entry[:only_paths]
+        model[:except_paths] = Array(entry[:except_paths]) if entry[:except_paths]
+        model
       end
+    end
+
+    # @param model_config [Hash] a tracked_models entry
+    # @param path [String] the raw request path
+    # @return [Boolean] whether this model should track the given path
+    def model_tracks_path?(model_config, path)
+      return false if model_config[:only_paths] && !path_matches_any?(model_config[:only_paths], path)
+      return false if model_config[:except_paths] && path_matches_any?(model_config[:except_paths], path)
+
+      true
     end
 
     def ignored?(path)
@@ -52,6 +65,15 @@ module UserPatterns
     end
 
     private
+
+    def path_matches_any?(patterns, path)
+      patterns.any? do |pattern|
+        case pattern
+        when Regexp then pattern.match?(path)
+        when String then pattern == path
+        end
+      end
+    end
 
     def initialize_alert_defaults
       @mode = :collection

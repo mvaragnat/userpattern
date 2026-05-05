@@ -33,10 +33,7 @@ module UserPatterns
     def _user_patterns_enforce_limits
       endpoint = "#{request.method} #{UserPatterns::PathNormalizer.normalize(request.fullpath)}"
 
-      UserPatterns.configuration.tracked_models.each do |model_config|
-        user = _user_patterns_resolve(model_config[:current_method])
-        next unless user
-
+      _user_patterns_each_matching_model do |model_config, user|
         UserPatterns.rate_limiter.check_and_increment!(user.id, model_config[:name], endpoint)
       end
     end
@@ -70,16 +67,24 @@ module UserPatterns
     end
 
     def _user_patterns_record_matching_models
-      UserPatterns.configuration.tracked_models.each do |model_config|
-        user = _user_patterns_resolve(model_config[:current_method])
-        next unless user
-
+      _user_patterns_each_matching_model do |model_config, _user|
         UserPatterns.buffer.push(
           model_type: model_config[:name],
           endpoint: "#{request.method} #{UserPatterns::PathNormalizer.normalize(request.fullpath)}",
           anonymous_session_id: UserPatterns::Anonymizer.anonymize(request),
           recorded_at: Time.current
         )
+      end
+    end
+
+    def _user_patterns_each_matching_model
+      UserPatterns.configuration.tracked_models.each do |model_config|
+        next unless UserPatterns.configuration.model_tracks_path?(model_config, request.path)
+
+        user = _user_patterns_resolve(model_config[:current_method])
+        next unless user
+
+        yield model_config, user
       end
     end
 
