@@ -93,6 +93,11 @@ RSpec.describe UserPatterns::Configuration do
       expect(config.ignored?('/api/internal/status')).to be true
       expect(config.ignored?('/api/public')).to be false
     end
+
+    it 'does not match non-string/non-regexp patterns' do
+      config.ignored_paths = [:symbol_pattern]
+      expect(config.ignored?('/anything')).to be false
+    end
   end
 
   describe '#tracked_models=' do
@@ -178,6 +183,11 @@ RSpec.describe UserPatterns::Configuration do
       expect(config.model_tracks_path?(model, '/admin/team')).to be true
       expect(config.model_tracks_path?(model, '/admin/internal/debug')).to be false
       expect(config.model_tracks_path?(model, '/users')).to be false
+    end
+
+    it 'ignores non-string/non-regexp patterns in path filters' do
+      model = { name: 'User', current_method: :current_user, except_paths: [:symbol_pattern] }
+      expect(config.model_tracks_path?(model, '/anything')).to be true
     end
   end
 end

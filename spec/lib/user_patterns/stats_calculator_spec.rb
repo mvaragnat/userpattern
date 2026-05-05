@@ -151,5 +151,10 @@ RSpec.describe UserPatterns::StatsCalculator do
     it 'returns 0.0 from safe_divide when denominator is nil' do
       expect(calculator.send(:safe_divide, 10, nil)).to eq(0.0)
     end
+
+    it 'returns zero stats from per_session_bucket_stats when no events match' do
+      result = calculator.send(:per_session_bucket_stats, 'Ghost', 'GET /nowhere', :minute)
+      expect(result).to eq({ max: 0, avg: 0.0 })
+    end
   end
 end
