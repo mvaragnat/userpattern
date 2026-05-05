@@ -22,7 +22,7 @@ RSpec.describe 'Controller tracking', type: :request do
 
       it 'records the correct model_type and endpoint' do
         get '/test_page'
-        UserPatterns.buffer.flush
+        perform_enqueued_jobs { UserPatterns.buffer.flush }
 
         event = UserPatterns::RequestEvent.last
         expect(event.model_type).to eq('User')
@@ -31,7 +31,7 @@ RSpec.describe 'Controller tracking', type: :request do
 
       it 'generates an anonymous session id' do
         get '/test_page'
-        UserPatterns.buffer.flush
+        perform_enqueued_jobs { UserPatterns.buffer.flush }
 
         event = UserPatterns::RequestEvent.last
         expect(event.anonymous_session_id).to match(/\A[0-9a-f]{16}\z/)

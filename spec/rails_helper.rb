@@ -4,6 +4,7 @@ ENV['RAILS_ENV'] = 'test'
 ENV['DATABASE_URL'] = 'sqlite3::memory:'
 
 require 'active_record/railtie'
+require 'active_job/railtie'
 require 'action_controller/railtie'
 require 'action_view/railtie'
 require 'user_patterns'
@@ -13,6 +14,7 @@ module Dummy
     config.root = File.expand_path('dummy', __dir__)
     config.load_defaults 7.0
     config.eager_load = false
+    config.active_job.queue_adapter = :test
     config.secret_key_base = 'test_secret_key_base_for_user_patterns_specs_abcdef1234567890'
     config.hosts.clear
     config.action_dispatch.show_exceptions = :none
@@ -68,6 +70,7 @@ require 'rspec/rails'
 RSpec.configure do |config|
   config.use_transactional_fixtures = true
   config.infer_spec_type_from_file_location!
+  config.include ActiveJob::TestHelper
 
   config.before do
     UserPatterns.reset!
