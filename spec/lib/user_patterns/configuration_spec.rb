@@ -93,6 +93,11 @@ RSpec.describe UserPatterns::Configuration do
       expect(config.ignored?('/api/internal/status')).to be true
       expect(config.ignored?('/api/public')).to be false
     end
+
+    it 'does not match non-string/non-regexp patterns' do
+      config.ignored_paths = [:symbol_pattern]
+      expect(config.ignored?('/anything')).to be false
+    end
   end
 
   describe '#tracked_models=' do
