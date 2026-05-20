@@ -68,7 +68,6 @@ require 'rspec/rails'
 RSpec.configure do |config|
   config.use_transactional_fixtures = true
   config.infer_spec_type_from_file_location!
-
   config.before do
     UserPatterns.reset!
     UserPatterns.configuration.anonymous_salt = 'test_salt_32chars_for_hmac_key!!'

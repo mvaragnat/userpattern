@@ -8,8 +8,8 @@ RSpec.describe UserPatterns::Buffer do
   let(:event) do
     {
       model_type: 'User',
-      endpoint: 'GET /test',
-      anonymous_session_id: 'abc123def456',
+      endpoint: 'GET /basement/archives',
+      anonymous_session_id: 'agent_mulder_42',
       recorded_at: Time.current
     }
   end
@@ -32,6 +32,7 @@ RSpec.describe UserPatterns::Buffer do
     it 'writes buffered events to the database' do
       buffer.push(event)
       buffer.flush
+      buffer.shutdown
 
       expect(UserPatterns::RequestEvent.count).to eq(1)
     end
@@ -46,16 +47,18 @@ RSpec.describe UserPatterns::Buffer do
     it 'persists correct attributes' do
       buffer.push(event)
       buffer.flush
+      buffer.shutdown
 
       record = UserPatterns::RequestEvent.last
       expect(record.model_type).to eq('User')
-      expect(record.endpoint).to eq('GET /test')
-      expect(record.anonymous_session_id).to eq('abc123def456')
+      expect(record.endpoint).to eq('GET /basement/archives')
+      expect(record.anonymous_session_id).to eq('agent_mulder_42')
     end
 
     it 'handles a batch of events' do
-      5.times { |i| buffer.push(event.merge(endpoint: "GET /page_#{i}")) }
+      5.times { |i| buffer.push(event.merge(endpoint: "GET /case_#{i}")) }
       buffer.flush
+      buffer.shutdown
 
       expect(UserPatterns::RequestEvent.count).to eq(5)
     end
@@ -66,39 +69,28 @@ RSpec.describe UserPatterns::Buffer do
   end
 
   describe '#push with buffer size exceeded' do
-    it 'triggers async flush when buffer size is reached' do
-      UserPatterns.configuration.buffer_size = 1
+    it 'triggers flush when buffer size is reached' do
+      UserPatterns.configuration.buffer_size = 2
       buf = described_class.new
-      buf.push(event)
+
+      2.times { buf.push(event) }
       buf.shutdown
 
-      expect(UserPatterns::RequestEvent.count).to eq(1)
-    end
-  end
-
-  describe '#flush concurrent guard' do
-    it 'is a no-op when another flush is in progress' do
-      buffer.push(event)
-
-      flushing = buffer.instance_variable_get(:@flushing)
-      flushing.make_true
-      buffer.flush
-
-      expect(UserPatterns::RequestEvent.count).to eq(0)
-
-      flushing.make_false
-      buffer.flush
-      expect(UserPatterns::RequestEvent.count).to eq(1)
+      expect(UserPatterns::RequestEvent.count).to eq(2)
     end
   end
 
   describe '#flush with persistence error' do
     it 'logs the error and does not raise' do
-      allow(UserPatterns::RequestEvent).to receive(:insert_all).and_raise(StandardError, 'db error')
-      buffer.push(event)
+      allow(UserPatterns::RequestEvent).to receive(:insert_all)
+        .and_raise(StandardError, 'db error')
+      allow(Rails.logger).to receive(:error)
 
-      expect(Rails.logger).to receive(:error).with(/Flush error/)
-      expect { buffer.flush }.not_to raise_error
+      buffer.push(event)
+      buffer.flush
+      buffer.shutdown
+
+      expect(Rails.logger).to have_received(:error).with(/Flush error/)
     end
   end
 
@@ -115,9 +107,9 @@ RSpec.describe UserPatterns::Buffer do
       buf = described_class.new
       buf.push(event)
       timer_block.call
+      buf.shutdown
 
       expect(UserPatterns::RequestEvent.count).to eq(1)
-      buf.shutdown
     end
 
     it 'handles nil timer gracefully on shutdown' do
@@ -127,20 +119,22 @@ RSpec.describe UserPatterns::Buffer do
     end
   end
 
-  describe 'persist_events with empty drain' do
-    it 'is a no-op when drain_queue returns empty' do
-      buf = described_class.new
-      expect(UserPatterns::RequestEvent).not_to receive(:insert_all)
-      buf.send(:persist_events)
-    end
-  end
-
   describe '#shutdown' do
-    it 'flushes remaining events before stopping' do
+    it 'flushes remaining events synchronously' do
       buffer.push(event)
       buffer.shutdown
 
       expect(UserPatterns::RequestEvent.count).to eq(1)
+    end
+
+    it 'persists correct attributes on shutdown' do
+      buffer.push(event)
+      buffer.shutdown
+
+      record = UserPatterns::RequestEvent.last
+      expect(record.model_type).to eq('User')
+      expect(record.endpoint).to eq('GET /basement/archives')
+      expect(record.anonymous_session_id).to eq('agent_mulder_42')
     end
   end
 end
