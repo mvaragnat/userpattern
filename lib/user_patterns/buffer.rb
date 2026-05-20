@@ -4,10 +4,11 @@ require 'concurrent'
 
 module UserPatterns
   # Thread-safe in-memory buffer that batches request events before flushing
-  # via Active Job. Per-request overhead is a single mutex-protected array push.
+  # to the database. Per-request overhead is a single mutex-protected array push.
   #
-  # Normal path: events queue up → timer or size threshold triggers flush →
-  # FlushEventsJob is enqueued → job backend persists the batch.
+  # A SingleThreadExecutor serializes all DB writes on a dedicated thread,
+  # keeping exactly one connection checked out and zero contention with
+  # the web workers' pool.
   #
   # Shutdown path: remaining events are written synchronously so nothing is
   # lost when the process exits.
@@ -17,7 +18,7 @@ module UserPatterns
     def initialize
       @queue = []
       @mutex = Mutex.new
-      @flushing = Concurrent::AtomicBoolean.new(false)
+      @executor = Concurrent::SingleThreadExecutor.new
       start_timer
     end
 
@@ -31,18 +32,18 @@ module UserPatterns
     end
 
     def flush
-      return unless @flushing.make_true
-
       events = drain_queue
-      enqueue_persist(events) unless events.empty?
-    ensure
-      @flushing.make_false
+      return if events.empty?
+
+      @executor.post { persist(events) }
     end
 
     def shutdown
       @timer&.shutdown
+      @executor.shutdown
+      @executor.wait_for_termination(5)
       events = drain_queue
-      persist_now(events) unless events.empty?
+      persist(events) unless events.empty?
     end
 
     def size
@@ -55,14 +56,7 @@ module UserPatterns
       @mutex.synchronize { @queue.shift(MAX_DRAIN) }
     end
 
-    def enqueue_persist(events)
-      UserPatterns::FlushEventsJob.perform_later(events)
-    rescue StandardError => e
-      Rails.logger.error("[UserPatterns] Enqueue error, falling back to sync: #{e.message}")
-      persist_now(events)
-    end
-
-    def persist_now(events)
+    def persist(events)
       now = Time.current
       rows = events.map { |e| e.merge(created_at: now) }
       UserPatterns::RequestEvent.insert_all(rows)

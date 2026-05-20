@@ -29,11 +29,12 @@ RSpec.describe UserPatterns::Buffer do
   end
 
   describe '#flush' do
-    it 'enqueues a FlushEventsJob with buffered events' do
+    it 'writes buffered events to the database' do
       buffer.push(event)
+      buffer.flush
+      buffer.shutdown
 
-      expect { buffer.flush }
-        .to have_enqueued_job(UserPatterns::FlushEventsJob).with([event])
+      expect(UserPatterns::RequestEvent.count).to eq(1)
     end
 
     it 'clears the queue' do
@@ -43,9 +44,27 @@ RSpec.describe UserPatterns::Buffer do
       expect(buffer.size).to eq(0)
     end
 
+    it 'persists correct attributes' do
+      buffer.push(event)
+      buffer.flush
+      buffer.shutdown
+
+      record = UserPatterns::RequestEvent.last
+      expect(record.model_type).to eq('User')
+      expect(record.endpoint).to eq('GET /basement/archives')
+      expect(record.anonymous_session_id).to eq('agent_mulder_42')
+    end
+
+    it 'handles a batch of events' do
+      5.times { |i| buffer.push(event.merge(endpoint: "GET /case_#{i}")) }
+      buffer.flush
+      buffer.shutdown
+
+      expect(UserPatterns::RequestEvent.count).to eq(5)
+    end
+
     it 'is a no-op when the queue is empty' do
-      expect { buffer.flush }
-        .not_to have_enqueued_job(UserPatterns::FlushEventsJob)
+      expect { buffer.flush }.not_to change(UserPatterns::RequestEvent, :count)
     end
   end
 
@@ -54,66 +73,24 @@ RSpec.describe UserPatterns::Buffer do
       UserPatterns.configuration.buffer_size = 2
       buf = described_class.new
 
-      buf.push(event)
-      expect { buf.push(event) }
-        .to have_enqueued_job(UserPatterns::FlushEventsJob)
-
+      2.times { buf.push(event) }
       buf.shutdown
+
+      expect(UserPatterns::RequestEvent.count).to eq(2)
     end
   end
 
-  describe '#flush concurrent guard' do
-    it 'is a no-op when another flush is in progress' do
-      buffer.push(event)
-
-      flushing = buffer.instance_variable_get(:@flushing)
-      flushing.make_true
-      buffer.flush
-
-      expect(buffer.size).to eq(1)
-
-      flushing.make_false
-      buffer.flush
-      expect(buffer.size).to eq(0)
-    end
-  end
-
-  describe '#flush enqueue failure' do
-    it 'falls back to synchronous persistence when enqueue fails' do
-      allow(UserPatterns::FlushEventsJob).to receive(:perform_later)
-        .and_raise(StandardError, 'Redis down')
-
-      buffer.push(event)
-      buffer.flush
-
-      expect(UserPatterns::RequestEvent.count).to eq(1)
-    end
-
-    it 'logs the enqueue error' do
-      allow(UserPatterns::FlushEventsJob).to receive(:perform_later)
-        .and_raise(StandardError, 'Redis down')
-      allow(Rails.logger).to receive(:error)
-
-      buffer.push(event)
-      buffer.flush
-
-      expect(Rails.logger).to have_received(:error).with(/Enqueue error.*Redis down/)
-    end
-  end
-
-  describe '#flush with sync persistence error' do
+  describe '#flush with persistence error' do
     it 'logs the error and does not raise' do
-      allow(UserPatterns::FlushEventsJob).to receive(:perform_later)
-        .and_raise(StandardError, 'enqueue failed')
       allow(UserPatterns::RequestEvent).to receive(:insert_all)
         .and_raise(StandardError, 'db error')
       allow(Rails.logger).to receive(:error)
 
       buffer.push(event)
+      buffer.flush
+      buffer.shutdown
 
-      expect { buffer.flush }.not_to raise_error
-      expect(Rails.logger).to have_received(:error).with(/Enqueue error/).ordered
-      expect(Rails.logger).to have_received(:error).with(/Flush error/).ordered
+      expect(Rails.logger).to have_received(:error).with(/Flush error/)
     end
   end
 
@@ -130,9 +107,9 @@ RSpec.describe UserPatterns::Buffer do
       buf = described_class.new
       buf.push(event)
       timer_block.call
-
-      expect(buf.size).to eq(0)
       buf.shutdown
+
+      expect(UserPatterns::RequestEvent.count).to eq(1)
     end
 
     it 'handles nil timer gracefully on shutdown' do
@@ -143,7 +120,7 @@ RSpec.describe UserPatterns::Buffer do
   end
 
   describe '#shutdown' do
-    it 'writes remaining events synchronously' do
+    it 'flushes remaining events synchronously' do
       buffer.push(event)
       buffer.shutdown
 
